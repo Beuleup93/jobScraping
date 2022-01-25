@@ -1,26 +1,57 @@
-#
-# This is the server logic of a Shiny web application. You can run the
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
 
 library(shiny)
+library(dplyr)
+library(ggplot2)
+library(rgdal)
+library(RColorBrewer)
+library(googleVis)
+library(leaflet)
+suppressPackageStartupMessages(library(googleVis))
 
-# Define server logic required to draw a histogram
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
 
-    output$distPlot <- renderPlot({
+    # icons
+    output$entreprises <- renderInfoBox({
+        infoBox("entrprises", 100 - 50,
+                icon = icon("calendar", lib = "font-awesome"),
+                color = "blue",
+                fill = TRUE)
+    })
 
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
+    output$emplois <- renderInfoBox({
+        infoBox("emplois", 1245,
+                icon = icon("user"),
+                color = "purple",
+                fill = TRUE)
+    })
 
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white')
+    output$percentNew <- renderInfoBox({
+        infoBox("New job",24,
+            icon = icon("pie-chart"),
+            color = "yellow",
+            fill = TRUE)
+    })
 
+    output$notifications <- renderMenu({
+        users <- 1245
+        newusers <- 24
+        notifData <- data.frame("number" = c(users, newusers),
+                                "text" = c(" users", "% new users"),
+                                "icon"= c("users", "user"))
+
+        notifs <- apply(notifData, 1, function(row) {
+            notificationItem(text = paste0(row[["number"]], row[["text"]]),
+                             icon = icon(row[["icon"]]))
+        })
+
+        dropdownMenu(type = "notifications", .list = notifs)
+    })
+
+    #set.seed(122)
+    histdata <- rnorm(500)
+    output$plot1 <- renderPlot({
+        data <- histdata[seq_len(input$slider)]
+        hist(data)
     })
 
 })
