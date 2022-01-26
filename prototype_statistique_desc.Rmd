@@ -1,0 +1,74 @@
+---
+title: "Untitled"
+author: "Saliou NDAO"
+date: "1/26/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+# Chargement des librairies
+library(httr)
+library(jsonlite)
+library(RMySQL)
+library(dplyr)
+library(stringr)
+
+# Parametres de connexion BD
+options(mysql = list(
+  "host" = "127.0.0.1",
+  "port" = 8889,
+  "user" = "root",
+  "password" = "root",
+  "databaseName" = "bd_emploi"
+))
+
+getSingleConnexion <- function(){
+  db <- dbConnect(MySQL(),
+                  dbname = options()$mysql$databaseName,
+                  host = options()$mysql$host,
+                  port = options()$mysql$port,
+                  user = options()$mysql$user,
+                  password = options()$mysql$password)
+  return(db)
+}
+```
+
+```{r pressure, echo=FALSE}
+s = getSingleConnexion()
+summary(s)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+getPostFromBD <- function(){
+  db <- getSingleConnexion()
+  query <- sprintf("SELECT * FROM POST")
+  dbSendQuery(db, "SET NAMES utf8mb4;")
+  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
+```
+
+```{r pressure, echo=FALSE}
+res = getPostFromBD()
+head(res)
+```
+
+```{r pressure, echo=FALSE}
+colnames(res)
+```

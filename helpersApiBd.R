@@ -141,10 +141,10 @@ loadCommuneInBdFromApi <- function(){
   dbDisconnect(db)
 }
 
-loadCommuneInBdFromApi(r)
+#loadCommuneInBdFromApi(r)
 
 # Insertion des secteurs d'activité dans la base
-token = generateToken(urlPost)
+#token = generateToken(urlPost)
 loadSecteurActInBdFromApi<- function(token){
   url ="https://api.emploi-store.fr/partenaire/offresdemploi/v2/referentiel/secteursActivites"
   authorization = sprintf("%s %s", content(token)$token_type, content(token)$access_token)
@@ -209,7 +209,7 @@ loadTypeContratInBdFromApi<- function(token){
 
 findNatureContratByLibelle<- function(libelle){
   db <- getSingleConnexion()
-  query <- sprintf("SELECT * FROM natureContrat where libelle = '%s'", paste(libelle, collapse = ", "))
+  query <- sprintf("SELECT * FROM natureContrat where libelle = '%s'", paste(gsub("'", "", libelle), collapse = ", "))
   dbSendQuery(db, "SET NAMES utf8mb4;")
   dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
   res = dbGetQuery(db, query)
@@ -245,11 +245,12 @@ loadNatureContratInBdFromApi<- function(token){
 }
 
 #____________________________ JOB
-loadJobFromApi<- function(token, range, secteurActivite){
+loadJobFromApi<- function(token, rangeDebut=NULL,rangeFin=NULL, secteurActivite=NULL){
   # 01 France, secteur d'activité: 62(Programmation, conseil et autres activités informatiques)
   #26(Fabrication de produits informatiques, électroniques et optiques) 63(service information)
   #61: telecommunication, 60:Programmation et diffusion, 65: assurrance, 72: Recherche-développement scientifique
-  url <- "https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search?paysContinent=01&range=299-448&secteurActivite=62,26"
+  url <- sprintf("https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search?paysContinent=01&range=%s-%s&secteurActivite=%s",rangeDebut,rangeFin,secteurActivite)
+  #url = "https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search?paysContinent=01&range=300-449&secteurActivite=61"
   authorization = sprintf("%s %s", content(token)$token_type, content(token)$access_token)
   response = GET(url, add_headers(Authorization = authorization), Encoding="UTF-8")
   df = jsonlite::fromJSON(toJSON(content(response)))
@@ -257,7 +258,7 @@ loadJobFromApi<- function(token, range, secteurActivite){
   df = df$resultats
   df = df[-which(df$entreprise$nom=='NULL' | df$lieuTravail$commune=='NULL'),]
   entrepriseDf = df$entreprise %>% distinct(nom, .keep_all= TRUE)
-  entrepriseDf$entrepriseAdaptee = NULL # supprimer le champ
+  entrepriseDf = subset(entrepriseDf, select = c(nom,description,url,logo))
 
   # Build data frame POST
   dataf = cbind(df$entreprise$nom, df$lieuTravai$commune, df$lieuTravai$libelle, df$salaire$libelle)
@@ -284,6 +285,19 @@ loadJobFromApi<- function(token, range, secteurActivite){
   return (list(en = entrepriseDf, dfPost = dfPost))
 }
 
+loadAllJobFromAPI<- function(token, secteurActivite){
+  rangeDebut <- 0
+  rangeFin <- 149
+  while(rangeDebut<200 & rangeDebut < rangeFin){
+    loadJobFromApi(token, rangeDebut, rangeFin, secteurActivite)
+    rangeDebut = rangeFin+1
+    rangeFin = rangeFin+150
+  }
+  print("Chargement terminé")
+}
+#_________Chargement_______
+#r = generateToken(urlPost)
+#loadAllJobFromAPI(r, 86) # 61: telecommunication, 65 Assurance
 
 #__________Verifier que le poste n'existe pas déja dans la base_________________
 findPostById <- function(id){
@@ -324,8 +338,10 @@ savePost<- function(df){
       }else{
         competences = ""
       }
-      if(length(row[5]) > 0){
+      if(length(findNatureContratByLibelle(row[5])$code_natureContrat) > 0){
         code_natureContrat = findNatureContratByLibelle(row[5])$code_natureContrat
+      }else{
+        code_natureContrat = "E1"
       }
       # Build Query
       query <-sprintf(
@@ -355,21 +371,21 @@ savePost<- function(df){
         paste(row[3], collapse = ", "), # secteurActivite
         paste(row[4], collapse = ", "), # typeContrat
         paste(code_natureContrat, collapse = ", "), # natureContrat
-        paste(row[6], collapse = ", "), # libelle_qualification
+        paste(gsub("'", "", row[6]), collapse = ", "), # libelle_qualification
         paste(row[7], collapse = ", "), # code_commune
         paste(strptime(as.character(row[8]), tz = tz, format = "%Y-%m-%dT%H:%M:%OSZ"), collapse = ", "), # dateCreation
         paste(strptime(as.character(row[9]), tz = tz, format = "%Y-%m-%dT%H:%M:%OSZ"), collapse = ", "), # dateActualisation
         paste(gsub("'", "", row[10]), collapse = ", "), # intitule
         paste(gsub("'", "", row[11]), collapse = ", "), # description
-        paste(row[12], collapse = ", "), # libelleSalaire
-        paste(row[13], collapse = ", "), # experienceExige
+        paste(gsub("'", "", row[12]), collapse = ", "), # libelleSalaire
+        paste(gsub("'", "", row[13]), collapse = ", "), # experienceExige
         paste(gsub("'", "", row[14]), collapse = ", "), # experienceLibelle
-        paste(row[15], collapse = ", "), # dureeTravailLibelle
-        paste(row[16], collapse = ", "), # dureeTravailLibelleConverti
+        paste(gsub("'", "", row[15]), collapse = ", "), # dureeTravailLibelle
+        paste(gsub("'", "", row[16]), collapse = ", "), # dureeTravailLibelleConverti
         paste(row[17], collapse = ", "), # nombrePostes
         paste(row[18], collapse = ", "), # alternance
-        paste(gsub("'", "", row[19]), collapse = ", "),
-        paste(gsub("'", "", competences), collapse = ", ")) #libelle_lieu
+        paste(gsub("'", "", row[19]), collapse = ", "), #libelle_lieu
+        paste(gsub("'", "", competences), collapse = ", "))
       print(query)
       # Insert secteur In DB
       db <- getSingleConnexion()
@@ -408,8 +424,8 @@ loadCompany <- function(df){
         paste("logo", collapse = ", "),
         paste(str_to_upper(gsub("'", "", row[1])), collapse = ", "),
         paste(gsub("'", "", row[2]), collapse = ", "),
-        paste(row[3], collapse = ", "),
-        paste(row[4], collapse = ", "))
+        paste(gsub("'", "", row[3]), collapse = ", "),
+        paste(gsub("'", "", row[4]), collapse = ", "))
       print(query)
       # Insert secteur In DB
       db <- getSingleConnexion()
@@ -423,15 +439,47 @@ loadCompany <- function(df){
 #_______________________________________________________________________________
 
 #_______________________________________________________________________________
-r = generateToken(urlPost) # Generate token
-dfList = loadJobFromApi(r) # Get data from API and insert in BD
-entrepriseDf = dfList$en # Liste des entreprise
-dfPost = dfList$dfPost # Liste des posts recuperer
+#r = generateToken(urlPost) # Generate token
+#dfList = loadJobFromApi(r) # Get data from API and insert in BD
+#entrepriseDf = dfList$en # Liste des entreprise
+#dfPost = dfList$dfPost # Liste des posts recuperer
 #_______________________________________________________________________________
 
+# Recuperer le nombre de ligne chargée
+getNumberOfRows<- function(table){
+  db <- getSingleConnexion()
+  query <- sprintf("SELECT COUNT(*) FROM %s", paste(table, collapse = ", "))
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
+
+getDistinctSecteur<- function(table, colonne){
+  db <- getSingleConnexion()
+  query <- sprintf("SELECT count(distinct %s) FROM %s",colonne ,table)
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
+
+# repartition des jobs selon les secteurs
+getPostBySecteur<- function(){
+  db <- getSingleConnexion()
+  query <- query <- sprintf("SELECT p.code_secteur,s.libelle as libelle_secteur,p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type FROM POST p
+                            INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
+                            INNER JOIN natureContrat n ON p.code_nature_contrat = n.code_natureContrat
+                            INNER JOIN typeContrat t ON p.code_type_contrat = t.code_type_contrat")
+  dbSendQuery(db, "SET NAMES utf8mb4;")
+  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
 
 
-
+getPostBySecteur() %>% ggplot(aes(x = code_secteur)) +
+  geom_bar(fill="#226D68") +
+  ggtitle("Repartition des Posts selon les secteurs")
 
 
 
