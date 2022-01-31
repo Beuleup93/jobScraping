@@ -1,10 +1,16 @@
 # Chargement des librairies
+library(tidyverse)
+library(tidytext)
 library(httr)
 library(jsonlite)
 library(RMySQL)
 library(dplyr)
+library(tidyr)
+library(wordcloud)
 library(stringr)
-
+library(tm)
+library(plotly)
+library(leaflet)
 
 # Parametres de connexion API
 options(api = list(
@@ -49,10 +55,11 @@ generateToken <- function(url){
 }
 
 # Test Acess Token
-r = generateToken(urlPost)
-print(content(r))
-print(paste("Token: ",content(r)$access_token))
-print(paste("Expire in:",content(r)$expires_in/60,"min"))
+r = generateToken(urlToken)
+attributes(r)
+print(httr::content(r))
+print(paste("Token: ",httr::content(r)$access_token))
+print(paste("Expire in:",httr::content(r)$expires_in/60,"min"))
 
 # Test connexion BD
 con = getSingleConnexion()
@@ -74,7 +81,7 @@ loadRegionInBdRegionFromApi <- function(){
       paste("nom_region", collapse = ", "),
       paste(row[2], collapse = ", "),
       paste(gsub("'", "", row[1]) , collapse = ", "))
-      # Insert Row In DB
+    # Insert Row In DB
     dbSendQuery(db, "SET NAMES utf8mb4;")
     dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
     res = dbGetQuery(db, query)
@@ -102,7 +109,7 @@ loadDepartementInBdFromApi<-function(){
       paste(row[2], collapse = ", "),
       paste(row[3] , collapse = ", "),
       paste(gsub("'", "", row[1]), collapse = ", "))
-      # Insert Row In DB
+    # Insert Row In DB
     dbSendQuery(db, "SET NAMES utf8mb4;")
     dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
     dbGetQuery(db, query)
@@ -462,13 +469,9 @@ getDistinctSecteur<- function(table, colonne){
   return(res)
 }
 
-# repartition des jobs selon les secteurs
-getPostBySecteur<- function(){
+getDataFromTable<- function(table){
   db <- getSingleConnexion()
-  query <- query <- sprintf("SELECT p.code_secteur,s.libelle as libelle_secteur,p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type FROM POST p
-                            INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
-                            INNER JOIN natureContrat n ON p.code_nature_contrat = n.code_natureContrat
-                            INNER JOIN typeContrat t ON p.code_type_contrat = t.code_type_contrat")
+  query <- sprintf("SELECT * FROM %s",table)
   dbSendQuery(db, "SET NAMES utf8mb4;")
   dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
   res = dbGetQuery(db, query)
@@ -477,9 +480,131 @@ getPostBySecteur<- function(){
 }
 
 
-getPostBySecteur() %>% ggplot(aes(x = code_secteur)) +
-  geom_bar(fill="#226D68") +
-  ggtitle("Repartition des Posts selon les secteurs")
+
+dd = getDataFromTable("secteursActivites")
+
+# repartition des jobs selon les secteurs
+getPost<- function(){
+  db <- getSingleConnexion()
+  query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur,s.libelle as libelle_secteur,
+                    p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type, r.nom_region,
+                    r.code_region, d.code_dept, d.nom_dept, c.code_commune, c.nom_commune, e.nom, e.description as summary, e.url,e.logo FROM POST p
+                            INNER JOIN entreprise e ON p.ref_entreprise = e.nom
+                            INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
+                            INNER JOIN natureContrat n ON p.code_nature_contrat = n.code_natureContrat
+                            INNER JOIN typeContrat t ON p.code_type_contrat = t.code_type_contrat
+                            INNER JOIN commune c ON p.code_commune = c.code_commune
+                            INNER JOIN departement d ON c.code_dept = d.code_dept
+                            INNER JOIN region r ON d.code_region = r.code_region")
+  dbSendQuery(db, "SET NAMES utf8mb4;")
+  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
+
+#df = getPost()
+processingCorpus<- function(df, secteur_activite=NA){
+  # stopword
+  stopwordd = as.data.frame(jsonlite::fromJSON("stop_words_french.json"))
+  colnames(stopwordd) = c("stwd")
+
+  if(!is.na(secteur_activite)){
+    # data of secteur activite
+    df = df[df$libelle_secteur==secteur_activite,]
+  }
+  # Joindre la colonne description intitule et competences postes
+  df = unite(df, text, description, competences, sep = " ")
+  # tible data frame
+  df_tible <- tibble(line=1:nrow(df),text=df$text)
+
+  # Nettoyage et tokenisation et lemmatisation avec SnowballC
+  clean_df <- df_tible %>%
+    mutate(text=gsub(x=text,pattern="[0-9]",replacement="")) %>%
+    mutate(text=gsub(x=text,pattern="\n",replacement="")) %>%
+    mutate(text=str_to_lower(text)) %>%
+    unnest_tokens(output=word,input=text) %>%
+    filter(!word %in% stopwordd$stwd) %>%
+    select(line,word)
+
+  # dictionnaire terme
+  dico_terme <- clean_df %>%
+    count(word,sort=TRUE)
+
+  #wordcloud
+  #wordcld = wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=10, max.word=50,colors = brewer.pal(8,'Dark2'), random.order = FALSE, scale = c(3,.5))
+
+  #comptage des termes par document
+  matrice_dt <- clean_df %>%
+    group_by(line,word) %>%
+    summarize(freq=n()) %>%
+    cast_dtm(document = line, term = word, value = freq) ##"cast" en MDT (pondération = fréquence) #autre pondération possible, ex. TF-IDF
+
+  return(list(df=df, dict_terme = dico_terme, matrice_dt = matrice_dt))
+}
+
+#res = processingCorpus(data)
+#res$dict_terme %>%  top_n(5)
+#mdt_matrix = as.matrix(res$matrice_dt)
+#pondération binaire
+#mat_pond <- ifelse(mdt_matrix>0,1,0)
+#df_pond <- as.data.frame(mat_pond)
+#sum_per_secteur_act <- aggregate(x=df_pond,by=list(data$code_secteur),sum)
+
+#library(FactoMineR)
+#hugo_ca <- CA(hugo_dtm %>% as.data.frame() %>%
+                #column_to_rownames("doc_id"), ncp = 1000, graph = FALSE)
+
+
+## fonction permettant de trouver les longitudes et latitudes
+## d'un vecteur contenant plusieurs adresses
+if (!(require(jsonlite))) install.packages("jsonlite")
+geocodeGratuit <- function(adresses){
+  # adresses est un vecteur contenant toutes les adresses sous forme de chaine de caracteres
+  nominatim_osm <- function(address = NULL){
+    ## details: http://wiki.openstreetmap.org/wiki/Nominatim
+    ## fonction nominatim_osm proposée par D.Kisler
+    if(suppressWarnings(is.null(address)))  return(data.frame())
+    tryCatch(
+      d <- jsonlite::fromJSON(
+        gsub('\\@addr\\@', gsub('\\s+', '\\%20', address),
+             'http://nominatim.openstreetmap.org/search/@addr@?format=json&addressdetails=0&limit=1')
+      ), error = function(c) return(data.frame())
+    )
+    if(length(d) == 0) return(data.frame())
+    return(c(as.numeric(d$lon), as.numeric(d$lat)))
+  }
+  tableau <- t(sapply(adresses,nominatim_osm))
+  colnames(tableau) <- c("lon","lat")
+  return(tableau)
+}
+
+getCoordonneesDept<- function(df){
+  dept = unique(df$nom_dept)
+  coor_dept= geocodeGratuit(dept)
+  return(as.data.frame(coor_dept))
+}
+
+getCoordonneesRegion<- function(df){
+  region = unique(df$nom_region)
+  coor_reg= geocodeGratuit(region)
+  return(as.data.frame(coor_reg))
+}
+
+getCoordonneesCommune<- function(df){
+  communes = unique(df$nom_commune)
+  coor_commune = geocodeGratuit(communes)
+  return(as.data.frame(coor_commune))
+}
+
+df_leaflet<- function(df,secteur_activite){
+  df = subset(df, df$libelle_secteur==secteur_activite, select=c(nom_region))
+  df = as.data.frame(df %>% group_by(nom_region)%>% summarise(count = n()))
+  coord = getCoordonneesRegion(df)
+  df$lon = coord$lon
+  df$lat = coord$lat
+  return(df)
+}
 
 
 
@@ -496,3 +621,39 @@ getPostBySecteur() %>% ggplot(aes(x = code_secteur)) +
 
 
 
+
+#####  Exemple d'utilisation pour trouver les coordonnees geographiques de 4 adresses
+#MesAdresses <- c("4 place Jussieu Paris","école Polytechnique, Palaiseau", "35000 France","Rennes")
+#coords = geocodeGratuit(MesAdresses)
+
+#dio = as.data.frame(df %>% group_by(nom_region)%>% summarise(count = n()))
+#coord = as.data.frame(getCoordonneesRegion(dio))
+#dio$lon = coord$lon
+#dio$lat = coord$lat
+
+
+
+#leaflet() %>% setView(
+  #lng = geocodeGratuit("France")[1,1],
+  #lat = geocodeGratuit("France")[1,2],
+  #zoom = 5
+#) %>% addProviderTiles(providers$Stamen.TonerLite, options = providerTileOptions(noWrap = TRUE)) #%>%
+#addMarkers(lat = ~lat)
+
+
+
+#library(doParallel)
+#set.seed(142)
+#cl <- makeCluster(4)
+#registerDoParallel(cl)
+#dd =df_leaflet(data, "Assurance")
+#stopCluster(cl)
+
+#geocodeGratuit(unique(dd$nom_commune[1:240]))#
+
+#dd %>% leaflet() %>%
+  #setView(lng = 1.888334, lat = 46.60335, zoom = 5)  %>% #setting the view over ~ center of North America
+  #addTiles() %>%
+  #addMarkers(lng = ~lon,
+             #lat = ~lat,
+             #popup = ~paste(nom_region," ",count))

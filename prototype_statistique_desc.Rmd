@@ -11,10 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
 ```{r cars}
 # Chargement des librairies
 library(httr)
@@ -48,9 +44,7 @@ s = getSingleConnexion()
 summary(s)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
+## Get 
 
 ```{r pressure, echo=FALSE}
 getPostFromBD <- function(){
@@ -65,10 +59,496 @@ getPostFromBD <- function(){
 ```
 
 ```{r pressure, echo=FALSE}
-res = getPostFromBD()
-head(res)
+allPost = getPostFromBD()
+head(allPost)
 ```
 
 ```{r pressure, echo=FALSE}
-colnames(res)
+getData<- function(){
+  db <- getSingleConnexion()
+  query <- query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur,s.libelle as        libelle_secteur,p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type, r.nom_region, r.code_region, d.code_dept, c.nom_commune FROM POST p
+                            INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
+                            INNER JOIN natureContrat n ON p.code_nature_contrat = n.code_natureContrat
+                            INNER JOIN typeContrat t ON p.code_type_contrat = t.code_type_contrat
+                            INNER JOIN commune c ON p.code_commune = c.code_commune
+                            INNER JOIN departement d ON c.code_dept = d.code_dept
+                            INNER JOIN region r ON d.code_region = r.code_region")
+  dbSendQuery(db, "SET NAMES utf8mb4;")
+  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
 ```
+
+
+```{r pressure, echo=FALSE}
+df = getData()
+head(df)
+```
+
+                
+```{r pressure, echo=FALSE}
+library(ggplot2)
+library(ggiraph)
+df %>% ggplot(aes(x = code_region)) +
+                geom_bar(fill="#26474E") +
+                ggtitle("Repartition des emplois selon la région")
+
+```   
+
+                
+```{r pressure, echo=FALSE}
+library(ggplot2)
+df %>% ggplot(aes(x = code_dept)) +
+                geom_bar(fill="#26474E") +
+                ggtitle("Repartition des emplois selon le type de contrat")
+
+
+```  
+
+
+```{r pressure, echo=FALSE}
+library(tidyverse)
+library(ggplot2)
+df %>% group_by(libelle_qualification)%>% 
+  summarise(count = n()) %>% 
+  filter(libelle_qualification != 'NULL')%>% 
+  ggplot() +
+  geom_col(aes(x = count, y=libelle_qualification), fill = "#26474E", width=.6) +
+  ggtitle("Repartition des emplois selon la qualification")
+```  
+
+```{r pressure, echo=FALSE}
+# codage en sac de mots
+library(tidyverse)
+data = getData()
+print(str(data))
+print(head(data))
+
+```  
+      
+
+```{r pressure, echo=FALSE}
+# codage en sac de mots
+head(data)
+```   
+                
+```{r pressure, echo=FALSE}
+tmp <- grep("\n",data$description)
+print(length(tmp))
+print(head(tmp))
+#Presence des chiffres dans la descriptions
+tmp <- grep('[0-9]',D$commentaires)
+print(length(tmp))
+```  
+
+#### Préparation des données
+
+```{r}
+#charger spécifiquement la libraire tidytext
+library(tidytext)
+#modifier la structure du tibble avec numerotatin des document
+data_tible <- tibble(line=1:nrow(data),description=data$description)
+print(head(data_tible))
+``` 
+
+#### Tokenisation
+
+Transformation des documents en une structure "tidy", en recensant les mots par document. L'information sur l'ordre des mots est perdue. On note en revanche que la casse a été changée, la ponctuation a été supprimée.
+
+```{r}
+#traiter le texte brut
+res_tb <- data_tible %>%
+  unnest_tokens(output=word,input=description)
+print(res_tb)
+```
+
+#### Inspection du 1er document
+
+```{r}
+#si on s'en tient aux mots du premier document
+mots_doc1 <- res_tb %>%
+  filter(line==1) %>%
+  select(word)
+print(mots_doc1$word)
+```
+
+```{r}
+#pour rappel le 1er document était...
+print(data$description[1])
+```
+
+#### Fréquence des termes dans les documents
+
+```{r}
+#dans le premier document
+mots_doc1 %>%
+  group_by(word) %>%
+  count(sort=TRUE)
+```
+
+```{r}
+#comptage des termes par document
+compte_A <- res_tb %>%
+  group_by(line,word) %>%
+  summarize(freq=n())
+print(compte_A)
+```
+
+#### Dictionnaire global des termes
+
+```{r}
+#dictionnaire - comptage
+#ordonnancement selon la fréquence
+dico_A <- res_tb %>%
+  count(word,sort=TRUE)
+#affichage
+print(dico_A)
+```
+
+```{r}
+#les termes les moins fréquents
+print(tail(dico_A))
+```
+## TidyText - Nettoyage des données
+
+#### Stopwords (mots-vides)
+
+Librairie pour les stopwords en anglais.
+
+```{r}
+#récupération des stopwords
+data("stop_words")
+
+stw = c("a","à","â","abord","afin","ah","ai","aie","ainsi","allaient","allo","allô","allons","après","assez","attendu","au","aucun","aucune","aujourd","aujourd'hui","auquel","aura","auront","aussi","autre","autres","aux","auxquelles","auxquels","avaient","avais","avait","avant","avec","avoir","ayant","b","bah","beaucoup","bien","bigre","boum","bravo","brrr","c","ça","car","ce","ceci","cela","celle","celle-ci","celle-là","celles","celles-ci","celles-là","celui","celui-ci","celui-là","cent","cependant","certain","certaine","certaines","certains","certes","ces","dune","dun","cet","cette","ceux","ceux-ci","ceux-là","chacun","chaque","cher","chère","chères","chers","chez","chiche","chut","ci","cinq","cinquantaine","cinquante","cinquantième","cinquième","clac","clic","combien","comme","comment","compris","concernant","contre","couic","crac","d","da","dans","de","debout","dedans","dehors","delà","depuis","derrière","des","dès","désormais","desquelles","desquels","dessous","dessus","deux","deuxième","deuxièmement","devant","devers","devra","différent","différente","différentes","différents","dire","divers","diverse","diverses","dix","dix-huit","dixième","dix-neuf","dix-sept","doit","doivent","donc","dont","douze","douzième","dring","du","duquel","durant","e","effet","eh","elle","elle-même","elles","elles-mêmes","en","encore","entre","envers","environ","es","ès","est","et","etant","étaient","étais","était","étant","etc","été","etre","être","eu","euh","eux","eux-mêmes","excepté","f","façon","fais","faisaient","faisant","fait","feront","fi","flac","floc","font","g","gens","h","avez","êtes","hein","hélas","hem","hep","hi","ho","holà","hop","hormis","hors","hou","houp","hue","hui","huit","huitième","hum","hurrah","i","il","ils","importe","j","je","jusqu","jusque","k","l","la","là","laquelle","las","le","lequel","les","lès","lesquelles","lesquels","leur","leurs","longtemps","lorsque","lui","lui-même","m","ma","maint","mais","malgré","me","même","mêmes","merci","mes","mien","mienne","miennes","miens","mille","mince","moi","moi-même","moins","mon","moyennant","n","na","ne","néanmoins","neuf","neuvième","ni","nombreuses","nombreux","non","nos","notre","nôtre","nôtres","nous","nous-mêmes","nul","o","o|","ô","oh","ohé","olé","ollé","on","ont","onze","onzième","ore","ou","où","ouf","ouias","oust","ouste","outre","p","paf","pan","par","parmi","partant","particulier","particulière","particulièrement","pas","passé","pendant","personne","peu","peut","peuvent","peux","pff","pfft","pfut","pif","plein","plouf","plus","plusieurs","plutôt","pouah","pour","pourquoi","premier","première","premièrement","près","proche","psitt","puisque","q","qu","quand","quant","quanta","quant-à-soi","quarante","quatorze","quatre","quatre-vingt","quatrième","quatrièmement","que","quel","quelconque","quelle","quelles","quelque","quelques","quelqu'un","quels","qui","quiconque","quinze","quoi","quoique","r","revoici","revoilà","rien","s","sa","sacrebleu","sans","sapristi","sauf","se","seize","selon","sept","septième","sera","seront","ses","si","sien","sienne","siennes","siens","sinon","six","sixième","soi","soi-même","soit","soixante","son","sont","sous","stop","suis","suivant","sur","surtout","t","ta","tac","tant","te","té","tel","telle","tellement","telles","tels","tenant","tes","tic","tien","tienne","tiennes","tiens","toc","toi","toi-même","ton","touchant","toujours","tous","tout","toute","toutes","treize","trente","très","trois","troisième","troisièmement","trop","tsoin","tsouin","tu","u","un","une","unes","uns","v","va","vais","vas","vé","vers","via","vif","vifs","vingt","vivat","vive","vives","vlan","voici","voilà","vont","vos","votre","vôtre","vôtres","vous","vous-mêmes","vu","w","x","y","z","zut","alors","aucuns","bon","devrait","dos","droite","début","essai","faites","fois","force","haut","ici","juste","maintenant","mine","mot","nommés","nouveaux","parce","parole","personnes","pièce","plupart","seulement","soyez","sujet","tandis","valeur","voie","voient","état","étions")
+# stopword francais
+
+stw = as.data.frame(stw)
+print(head(stw))
+
+```
+
+#### Seconde version de la tokenisation
+
+Sans les chiffres, la balise "saut de ligne" et les stopwords.
+
+```{r}
+#deuxième version, sans les chiffres et les br
+res_B <- data_tible %>%
+  mutate(text=gsub(x=description,pattern="[0-9]",replacement="")) %>%
+  mutate(text=gsub(x=text,pattern="\n",replacement="")) %>%
+  unnest_tokens(output=word,input=text) %>%
+  filter(!word %in% stw$stw) %>%
+  select(line,word)
+
+#affichage
+print(res_B)
+```
+
+```{r}
+#vérification pour le premier document
+print(res_B[res_B$line==1,]$word)
+```
+
+```{r}
+#par comparaison
+data_tible$description[1]
+```
+
+#### Dictionnaire des termes
+
+```{r}
+#dictionnaire
+dico_B <- res_B %>%
+  count(word,sort=TRUE)
+print(dico_B)
+```
+
+Avec un petit "wordcloud" pour faire joli...
+
+```{r warning=FALSE}
+#un petit wordcloud ici
+library(wordcloud)
+wordcloud(words=dico_B$word,freq=dico_B$n,max.word=100,colors = brewer.pal(8,'Dark2'))
+
+```
+
+#### Matrice documents-termes
+
+Une matrice avec en ligne les documents, en colonne les termes, et en valeurs la fréquence des termes dans les documents.
+
+```{r}
+#rappel structure tidy
+print(head(res_B))
+```
+
+
+```{r}
+#comptage des termes par document
+compte_B <- res_B %>%
+  group_by(line,word) %>%
+  summarize(freq=n())
+print(compte_B)
+```
+
+```{r}
+#nécessité de disposer de la librairie "tm"
+library(tm)
+
+#"cast" en MDT (pondération = fréquence)
+#autre pondération possible, ex. TF-IDF
+#cf. https://www.rdocumentation.org/packages/tidytext/versions/0.3.2/topics/bind_tf_idf
+mdt_B <- compte_B %>%
+  cast_dtm(document = line, term = word, value = freq)
+
+#affichage
+print(mdt_B)
+```
+
+```{r}
+#dans un format "matrix"
+#plus facile à manipuler pour nous
+mat_B <- as.matrix(mdt_B)
+
+#classe
+print(class(mat_B))
+
+#dimension
+print(dim(mat_B))
+```
+
+```{r}
+#comptage des termes pour le document 1
+print(mat_B[1,which(mat_B[1,]>0)])
+```
+
+```{r}
+#vérifions
+tmp <- compte_B %>%
+  filter(line==1)
+
+#affichage
+tmpvec <- tmp$freq
+names(tmpvec) <- tmp$word
+print(tmpvec)
+```
+
+#### Dictionnaire et fréquence des termes
+
+
+```{r}
+#pour rappel
+head(dico_B,20)
+```
+
+Refaire le calcul à partir de la matrice documents-termes.
+
+```{r}
+print(head(sort(colSums(mat_B),decreasing=TRUE),20))
+```
+
+
+#### Apparition des termes dans les documents
+
+Nombre de documents où les termes apparaissent au moins une fois.
+
+```{r}
+#comptage des doc.
+app_termes <- apply(mat_B,2,function(x){sum(x>0)})
+
+#affichage trié
+print(head(sort(app_termes,decreasing=TRUE),20))
+```
+
+#### Filtrage selon la fréquence
+
+Retirer de la matrice les termes qui apparaissent dans trop peu ou trop nombreux documents.
+
+```{r}
+#condition sur les colonnes
+mat_B_filtered <- mat_B[,app_termes > 5 ]
+
+#dimensions
+print(dim(mat_B_filtered))
+```
+
+## Analyse via la matrice documents-termes
+
+Quelques pistes pour éexploiter la matrice documents-termes.
+
+#### Polarité observée des termes
+
+N'oublions pas que les documents sont étiquetés (commentaires positifs ou négatifs). L'idée est de déterminer si les termes sont plus souvent associés à des documents positifs ou négatifs.
+
+On ne travaille que sur les termes filtrés, avec la pondération binaire.
+
+```{r}
+#pondération binaire
+mat_C <- ifelse(mat_B_filtered>0,1,0)
+
+#transformer la matrice en data.frame
+df_C <- as.data.frame(mat_C)
+print(class(df_C))
+```
+
+```{r echo=TRUE}
+#calcul conditionnel
+sum_per_class <- aggregate(x=df_C,by=list(data$code_secteur),sum)
+print(sum_per_class[,])
+```
+
+```{r echo=TRUE}
+#structure temporaire
+tmp <- as.matrix(sum_per_class[,2:ncol(sum_per_class)])
+row.names(tmp) <- sum_per_class$Group.1
+
+#proportion des positifs
+prop_pos <- tmp['pos',]/colSums(tmp)
+print(sort(prop_pos)[1:15])
+```
+
+```{r echo=TRUE}
+#ex. le cas de 'waste'
+print(tmp[,'waste'])
+```
+
+#### Schéma explicatif - Arbres de décision
+
+On n'est pas vraiment dans un schéma prédictif, mais plutôt dans la description. Sinon, il faudrait repenser le processus de préparation des données.
+
+```{r echo=TRUE}
+#construire un arbre de décision
+library(rpart)
+arbre <- rpart(D$label ~ ., data = df_C)
+print(arbre)
+```
+
+```{r echo=TRUE}
+#affichage plus sympathique
+library(rpart.plot)
+rpart.plot(arbre)
+```
+```{r echo=TRUE}
+#proportion de documents positifs pour les "pires" termes
+print(prop_pos[c('bad','worst','waste','boring')])
+```
+
+## Analyse des sentiments (traditionnelle)
+
+S'intéresser aux polarités de termes pour inférer sur la polarité des documents.
+
+#### Lexique des sentiments
+
+```{r}
+#lexique pour l'analyse des sentiments
+#polarité des termes - get_sentiments() de tidtytext
+#"bing" est une source possible, il y en a d'autres
+polarite_termes <- get_sentiments("bing")
+print(polarite_termes)
+```
+
+#### Polarité des documents
+
+Polarité d'un document = aggrégation de la polarité des termes qui le compose... s'ils sont recensés bien sûr. Pas besoin de partition apprentissage-test ici parce que la classe (label) n'est pas mise à contribution lors de la "modélisation". L'approche est non-supervisée par nature, pas de risque de surapprentissage.
+
+Calcul de la polarité des documents par utilisation du lexique des sentiments. Etape par étape.
+
+```{r}
+#recensement des termes par document
+res_B %>%
+  filter(line==1)
+```
+
+```{r}
+#pour un document, jointure avec le lexique
+res_B %>%
+  filter(line==1) %>%
+  left_join(polarite_termes,by="word")
+```
+
+```{r}
+#retrait des NA, à ne pas comptabiliser
+res_B %>%
+  filter(line==1) %>%
+  left_join(polarite_termes,by="word") %>%
+  filter(!is.na(sentiment))
+```
+```{r}
+#comptabilisation des polarités
+res_B %>%
+  filter(line==1) %>%
+  left_join(polarite_termes,by="word") %>%
+  filter(!is.na(sentiment)) %>%
+  count(sentiment)
+```
+
+Il ne reste plus qu'à réaliser l'opération sur l'ensemble des documents.
+
+```{r}
+#polarité des documents déduite des termes
+#qui les composent
+#--> proportion des termes positifs
+pol_per_doc <- res_B %>%
+  group_by(line) %>%
+  left_join(polarite_termes,by="word") %>%
+  filter(!is.na(sentiment)) %>%
+  count(sentiment) %>%
+  summarise(freq_pos=n[sentiment=='positive']/sum(n))
+
+#affichage
+print(pol_per_doc)
+```
+
+Attention, certains documents ne sont pas recensés (1916 documents notés en tout) parce qu'ils ne présentent aucun terme "positif".
+
+Prédiction par comparaison avec le seuil 0.5 c.-à-d. est considéré comme positif un commentaire s'il est composé au moins pour moitié de termes positifs.
+
+```{r echo=TRUE}
+#prédiction sur cette base
+pred_polarite <- rep(0,nrow(D))
+
+#affectation -- ternir compte des doc. non recensés
+pred_polarite[pol_per_doc$line] <- pol_per_doc$freq_pos
+
+#classe prédite
+class_pred_polarite <- ifelse(pred_polarite >= 0.5,"positive","negative")
+print(table(class_pred_polarite))
+```
+
+Confrontation avec les classes observées.
+
+```{r echo=TRUE}
+#matrice de confusion
+mc <-table(D$label,class_pred_polarite) 
+print(mc)
+```
+
+```{r echo=TRUE}
+#accuracy
+print(sum(diag(mc))/sum(mc))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
