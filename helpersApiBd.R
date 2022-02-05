@@ -749,3 +749,44 @@ Graph_Experience_Qualification = function(posts, secteur='Tous les dommaines'){
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
+
+
+lda_ <- function(df){
+
+}
+
+res = processingCorpus(head(n=100,df))
+dtm_matrix = as.matrix(res$matrice_dt)
+
+lda_out <- LDA(
+  dtm_matrix,
+  k = 2,
+  method = "Gibbs",
+  control = list(seed = 42)
+)
+lda_out
+glimpse(lda_out)
+
+lda_topics <- lda_out %>%
+  tidy(matrix = "beta")
+
+lda_topics %>%
+  arrange(desc(beta))
+
+##################@
+lda_topics <- LDA(dtm_matrix,k = 4,method = "Gibbs",control = list(seed = 42)) %>%
+  tidy(matrix = "beta")
+
+word_probs <- lda_topics %>%
+  group_by(topic) %>%
+  top_n(15, beta) %>%
+  ungroup() %>%
+  mutate(term2 = fct_reorder(term, beta))
+
+################
+ggplot(word_probs, aes(term2,beta,fill = as.factor(topic)))+
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+

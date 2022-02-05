@@ -31,6 +31,7 @@ sidebar <- dashboardSidebar(
 
         menuItem("Analyse corpus", icon = icon("th"),
                  menuSubItem("Frequence de mots", tabName = "statistique"),
+                 menuSubItem("Association de mots", tabName = "association"),
                  menuSubItem("Analyse correspondance", tabName = "AC"),
                  menuSubItem("Clustering", tabName = "clustering"),
                  menuSubItem("LDA", tabName = "lda")),
@@ -123,13 +124,19 @@ body <- dashboardBody(
                         column(6, dataTableOutput("table1"))
                     )
                 ),
+        ),
+
+        tabItem(tabName="association",
+                box(width=12,
+                    fluidRow(
+                        column(6,selectInput("words","choisir mot",choices = c("missions","formation"),selected = 'missions')),
+                        column(6, sliderInput(inputId = "plage",label = "Plage de mots", value = 20, min = 10, max = 200, step=1))
+                    )
+                ),
         )
     ),
     useShinyjs()
 )
 
 dashboardPage(header, sidebar, body, skin = "green")
-
-
-
 ############## fin UI##########
