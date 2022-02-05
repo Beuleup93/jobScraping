@@ -51,7 +51,7 @@ shinyServer(function(input, output, session) {
   })
 
   getACData <- reactive({
-    dataAC = getDataforAC(getReactiveData())
+    dataAC = getDataforAC(getReactiveData2())
     return(dataAC)
   })
 
@@ -71,7 +71,7 @@ shinyServer(function(input, output, session) {
     })
 
     output$percentNew <- renderInfoBox({
-        infoBox("Secteur d'activité",getDistinctSecteur("POST","code_secteur")[1,],
+        infoBox("Domaines",getDistinctSecteur("POST","code_secteur")[1,],
             icon = icon("pie-chart"),
             color = "yellow",
             fill = TRUE)
@@ -142,12 +142,13 @@ shinyServer(function(input, output, session) {
     })
 
     output$plot4 <- renderPlot({
-      df <-getReactiveData()
-      df = as.data.frame(getHoursByContrat(df))
-      df$dureeTravailLibelle = paste(df$dureeTravailLibelle,"H", sep='')
-      df %>%  ggplot()+
-        geom_col(aes(x = count, y=dureeTravailLibelle), fill = "#375D81", width=.6) +
-        ggtitle("Répartition du temps de travail en heures")
+      #df <-getReactiveData()
+      #df = as.data.frame(getHoursByContrat(df))
+      #df$dureeTravailLibelle = paste(df$dureeTravailLibelle,"H", sep='')
+      #df %>%  ggplot()+
+        #geom_col(aes(x = count, y=dureeTravailLibelle), fill = "#375D81", width=.6) +
+        #ggtitle("Répartition du temps de travail en heures")
+      Graph_Experience_Qualification(getReactiveData(), input$secteur)
     })
 
 
@@ -244,7 +245,6 @@ shinyServer(function(input, output, session) {
   })
 
   output$plot_ac <- renderPlotly({
-
     domaine_ca <- CA(getACData() %>% as.data.frame() %>%
                        column_to_rownames("Group.1"), ncp = 1000, graph = FALSE)
     domaine_ca_coord = domaine_ca$row$coord

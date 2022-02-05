@@ -16,6 +16,8 @@ library(ggplot2)
 library(scales)
 library(lubridate)
 library(GGally)
+library(topicmodels)
+library(forcats)
 
 
 
@@ -572,13 +574,14 @@ processingCorpus <- function(df, secteur_activite=NA){
   # wordcld = wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=10, max.word=50,colors = brewer.pal(8,'Dark2'), random.order = FALSE, scale = c(3,.5))
 
   #comptage des termes par document
-  matrice_dt <- clean_df %>%
+  matrice_dtm <- clean_df %>%
     group_by(line,word) %>%
     summarize(freq=n()) %>%
     cast_dtm(document = line, term = word, value = freq) ##"cast" en MDT (pondération = fréquence) #autre pondération possible, ex. TF-IDF
 
-  return(list(df=df, dict_terme = dico_terme, matrice_dt = matrice_dt))
+  return(list(df=df, dict_terme = dico_terme, matrice_dt = matrice_dtm))
 }
+
 
 
 getDataforAC <- function(data){
@@ -689,8 +692,6 @@ getHoursByContrat = function(posts){
   return(nbHeuresTravail)
 }
 
-
-
 normalize_heurestravail = function(posts){
   posts$dureeTravailLibelle = gsub("[[[:alpha:]]","",df$dureeTravailLibelle)
   posts$dureeTravailLibelle = str_sub(posts$dureeTravailLibelle,start = 1, end = 2)
@@ -720,13 +721,18 @@ filterNbEntityByYear <- function(posts, year='all'){
   }
 }
 
-Graph_Experience_Qualification = function(posts){
+Graph_Experience_Qualification = function(posts, secteur='Tous les dommaines'){
   posts$experienceExige = ifelse(posts$experienceExige=="E","Expérience exigée","Débutant accepté")
   posts$experienceExige = as.factor(posts$experienceExige)
   # Transformation en facteur du libelle qualification
   posts$libelle_qualification = as.factor(posts$libelle_qualification)
   # Sélection des données non vides pour la qualification
-  posts %>% group_by(libelle_qualification)%>% filter(libelle_qualification != 'NULL') -> qualification
+  qualification <- posts %>% group_by(libelle_qualification)%>%
+    filter(libelle_qualification != 'NULL')
+  if(secteur != 'Tous les domaines'){
+    qualification <- qualification %>%
+      filter(libelle_secteur == secteur)
+  }
   # Graphique
   ggplot(qualification, aes(x = libelle_qualification, fill = experienceExige)) +
     geom_bar(position = "fill") +
@@ -736,13 +742,10 @@ Graph_Experience_Qualification = function(posts){
     xlab("Qualifications") +
     ylab("Proportion") +
     # Titre de la légende + titre général
-    labs(fill = "Expérience demandée",title = "Répartition des expériences demandées en fonction des qualifications") +
+    labs(fill = "Expérience demandée",title = "Expériences demandées en fonction des qualifications") +
     # Affichage des valeurs sur les barres
     scale_y_continuous(labels = percent) +
     # Affichage incliné des noms des qualifications
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
-
-
-
 
