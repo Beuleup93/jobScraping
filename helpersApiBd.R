@@ -1,5 +1,4 @@
 # Chargement des librairies
-library(tidyverse)
 library(tidytext)
 library(httr)
 library(jsonlite)
@@ -11,6 +10,16 @@ library(stringr)
 library(tm)
 library(plotly)
 library(leaflet)
+library(FactoMineR)
+library(qdap)
+library(ggplot2)
+library(scales)
+library(lubridate)
+library(GGally)
+
+
+
+`%>%` <- magrittr::`%>%`
 
 # Parametres de connexion API
 options(api = list(
@@ -453,13 +462,23 @@ loadCompany <- function(df){
 #_______________________________________________________________________________
 
 # Recuperer le nombre de ligne chargée
-getNumberOfRows<- function(table){
+getNumberOfRows<- function(table, domaine="Tous les domaines", colonne_name=NA){
+  if(domaine=='Tous les domaines'){
+    query <- sprintf("SELECT COUNT(*) FROM %s", paste(table, collapse = ", "))
+  }else{
+    query <- sprintf("SELECT count(distinct %s) FROM POST p
+                   INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
+                   WHERE s.libelle = '%s' ",colonne_name,domaine)
+  }
   db <- getSingleConnexion()
-  query <- sprintf("SELECT COUNT(*) FROM %s", paste(table, collapse = ", "))
+  dbSendQuery(db, "SET NAMES utf8mb4;")
+  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
   res = dbGetQuery(db, query)
   dbDisconnect(db)
   return(res)
 }
+#getNumberOfRows("entreprise","Assurance", "ref_entreprise")
+
 
 getDistinctSecteur<- function(table, colonne){
   db <- getSingleConnexion()
@@ -484,9 +503,9 @@ getDataFromTable<- function(table){
 dd = getDataFromTable("secteursActivites")
 
 # repartition des jobs selon les secteurs
-getPost<- function(){
-  db <- getSingleConnexion()
-  query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur,s.libelle as libelle_secteur,
+getPost<- function(domaine="Tous les domaines"){
+  if(domaine == 'Tous les domaines'){
+    query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation,p.experienceExige, s.libelle as libelle_secteur,
                     p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type, r.nom_region,
                     r.code_region, d.code_dept, d.nom_dept, c.code_commune, c.nom_commune, e.nom, e.description as summary, e.url,e.logo FROM POST p
                             INNER JOIN entreprise e ON p.ref_entreprise = e.nom
@@ -496,25 +515,44 @@ getPost<- function(){
                             INNER JOIN commune c ON p.code_commune = c.code_commune
                             INNER JOIN departement d ON c.code_dept = d.code_dept
                             INNER JOIN region r ON d.code_region = r.code_region")
+  }else{
+    query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation, p.experienceExige, s.libelle as libelle_secteur,
+                    p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type, r.nom_region,
+                    r.code_region, d.code_dept, d.nom_dept, c.code_commune, c.nom_commune, e.nom, e.description as summary, e.url,e.logo FROM POST p
+                            INNER JOIN entreprise e ON p.ref_entreprise = e.nom
+                            INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
+                            INNER JOIN natureContrat n ON p.code_nature_contrat = n.code_natureContrat
+                            INNER JOIN typeContrat t ON p.code_type_contrat = t.code_type_contrat
+                            INNER JOIN commune c ON p.code_commune = c.code_commune
+                            INNER JOIN departement d ON c.code_dept = d.code_dept
+                            INNER JOIN region r ON d.code_region = r.code_region
+                            WHERE s.libelle = '%s'",domaine)
+  }
+
+  db <- getSingleConnexion()
   dbSendQuery(db, "SET NAMES utf8mb4;")
   dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
   res = dbGetQuery(db, query)
   dbDisconnect(db)
+  res$code_libellesecteur = paste(res$code_secteur,res$libelle_secteur, sep=" ")
   return(res)
 }
 
 #df = getPost()
-processingCorpus<- function(df, secteur_activite=NA){
+#colnames(df)
+
+processingCorpus <- function(df, secteur_activite=NA){
   # stopword
   stopwordd = as.data.frame(jsonlite::fromJSON("stop_words_french.json"))
   colnames(stopwordd) = c("stwd")
 
-  if(!is.na(secteur_activite)){
+  #if(!is.na(secteur_activite)){
     # data of secteur activite
-    df = df[df$libelle_secteur==secteur_activite,]
-  }
+    #df = df[df$libelle_secteur==secteur_activite,]
+  #}
   # Joindre la colonne description intitule et competences postes
   df = unite(df, text, description, competences, sep = " ")
+
   # tible data frame
   df_tible <- tibble(line=1:nrow(df),text=df$text)
 
@@ -526,13 +564,12 @@ processingCorpus<- function(df, secteur_activite=NA){
     unnest_tokens(output=word,input=text) %>%
     filter(!word %in% stopwordd$stwd) %>%
     select(line,word)
-
   # dictionnaire terme
   dico_terme <- clean_df %>%
     count(word,sort=TRUE)
 
   #wordcloud
-  #wordcld = wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=10, max.word=50,colors = brewer.pal(8,'Dark2'), random.order = FALSE, scale = c(3,.5))
+  # wordcld = wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=10, max.word=50,colors = brewer.pal(8,'Dark2'), random.order = FALSE, scale = c(3,.5))
 
   #comptage des termes par document
   matrice_dt <- clean_df %>%
@@ -543,18 +580,15 @@ processingCorpus<- function(df, secteur_activite=NA){
   return(list(df=df, dict_terme = dico_terme, matrice_dt = matrice_dt))
 }
 
-#res = processingCorpus(data)
-#res$dict_terme %>%  top_n(5)
-#mdt_matrix = as.matrix(res$matrice_dt)
-#pondération binaire
-#mat_pond <- ifelse(mdt_matrix>0,1,0)
-#df_pond <- as.data.frame(mat_pond)
-#sum_per_secteur_act <- aggregate(x=df_pond,by=list(data$code_secteur),sum)
 
-#library(FactoMineR)
-#hugo_ca <- CA(hugo_dtm %>% as.data.frame() %>%
-                #column_to_rownames("doc_id"), ncp = 1000, graph = FALSE)
-
+getDataforAC <- function(data){
+  res = processingCorpus(data)
+  mdt_matrix = as.matrix(res$matrice_dt)
+  mat_pond <- ifelse(mdt_matrix>0,1,0)
+  df_pond <- as.data.frame(mat_pond)
+  sum_per_secteur_act <- aggregate(x=df_pond,by=list(data$code_secteur),sum)
+  return(sum_per_secteur_act)
+}
 
 ## fonction permettant de trouver les longitudes et latitudes
 ## d'un vecteur contenant plusieurs adresses
@@ -597,63 +631,118 @@ getCoordonneesCommune<- function(df){
   return(as.data.frame(coor_commune))
 }
 
-df_leaflet<- function(df,secteur_activite){
-  df = subset(df, df$libelle_secteur==secteur_activite, select=c(nom_region))
-  df = as.data.frame(df %>% group_by(nom_region)%>% summarise(count = n()))
+df_leaflet<- function(df){
+  df = subset(df, select=c(nom_region))
+  df = as.data.frame(df %>% group_by(nom_region) %>% summarise(count = n()))
   coord = getCoordonneesRegion(df)
   df$lon = coord$lon
   df$lat = coord$lat
   return(df)
 }
 
+clean_corpus <- function(corpus){
+  stopwordd = as.data.frame(jsonlite::fromJSON("stop_words_french.json"))
+  colnames(stopwordd) = c("stwd")
+  corpus <- tm::tm_map(corpus, removePunctuation)
+  corpus <- tm::tm_map(corpus, stripWhitespace)
+  corpus <- tm::tm_map(corpus, removeNumbers)
+  corpus <- tm::tm_map(corpus, content_transformer(tolower))
+  corpus <- tm::tm_map(corpus, removeWords,c(stopwordd$stwd, "emploi","les","des","dun","dune","daux","dau"))
+  return(corpus)
+}
+
+
+tdm_dtm<- function(clean_corp){
+  # generate TDM (terme en ligne et document en clonne)
+  tdm <- TermDocumentMatrix(clean_corp)
+  # Generate DTM (document en ligne et terme en colonne)
+  dtm <- DocumentTermMatrix(clean_corp)
+  return(list(tdm =tdm, dtm=dtm) )
+}
+
+term_frequency_with_tdm <- function(tdm,top){
+  tdm_to_matrix <- as.matrix(tdm)
+  # Sum rows and sort by frequency
+  term_frequency <- rowSums(tdm_to_matrix)
+  term_frequency <- sort(term_frequency,decreasing = TRUE)
+  # Create a barplot
+  return(barplot(term_frequency[1:top], col = "tan",las = 2))
+}
+
+term_frequency_with_qdap<- function(vecteur_text,top){
+  frequency <- freq_terms(
+    vecteur_text,
+    top = top,
+    at.least = 3,
+    stopwords = "Top200Words"
+  )
+  # Plot term frequencies
+  return(plot(frequency))
+}
+
+getHoursByContrat = function(posts){
+  posts <- normalize_heurestravail(posts)
+  # Sélection des données
+  nbHeuresTravail <- posts %>% group_by(dureeTravailLibelle)%>%
+    summarise(count = n()) %>%
+    filter(dureeTravailLibelle > 23)
+  return(nbHeuresTravail)
+}
+
+
+
+normalize_heurestravail = function(posts){
+  posts$dureeTravailLibelle = gsub("[[[:alpha:]]","",df$dureeTravailLibelle)
+  posts$dureeTravailLibelle = str_sub(posts$dureeTravailLibelle,start = 1, end = 2)
+  posts[posts == ''] <- NA
+  posts[posts == ' '] <- NA
+  posts = na.omit(posts)
+  posts$dureeTravailLibelle = as.integer(posts$dureeTravailLibelle)
+  return(posts)
+}
+
+decompose_date = function(posts) {
+  posts$dateCreation = strptime(posts$dateCreation, format = "%Y-%m-%d %H:%M:%S")
+  # Séparation en année, mois, jour
+  posts$annee = year(posts$dateCreation)
+  posts$mois = month(posts$dateCreation)
+  posts$jour = day(posts$dateCreation)
+  #On supprime l'heure de date de création
+  posts$dateCreation = as.Date(posts$dateCreation,format = "%D")
+  return(posts)
+}
+
+filterNbEntityByYear <- function(posts, year='all'){
+  if(year !='all'){
+    p <- posts %>%
+      filter(annee==year)
+    return(dim(p)[1])
+  }
+}
+
+Graph_Experience_Qualification = function(posts){
+  posts$experienceExige = ifelse(posts$experienceExige=="E","Expérience exigée","Débutant accepté")
+  posts$experienceExige = as.factor(posts$experienceExige)
+  # Transformation en facteur du libelle qualification
+  posts$libelle_qualification = as.factor(posts$libelle_qualification)
+  # Sélection des données non vides pour la qualification
+  posts %>% group_by(libelle_qualification)%>% filter(libelle_qualification != 'NULL') -> qualification
+  # Graphique
+  ggplot(qualification, aes(x = libelle_qualification, fill = experienceExige)) +
+    geom_bar(position = "fill") +
+    # Ajout du texte
+    geom_text(aes(by = libelle_qualification), stat = "prop", position = position_fill(.5),size=3) +
+    # Titre des axes
+    xlab("Qualifications") +
+    ylab("Proportion") +
+    # Titre de la légende + titre général
+    labs(fill = "Expérience demandée",title = "Répartition des expériences demandées en fonction des qualifications") +
+    # Affichage des valeurs sur les barres
+    scale_y_continuous(labels = percent) +
+    # Affichage incliné des noms des qualifications
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-#####  Exemple d'utilisation pour trouver les coordonnees geographiques de 4 adresses
-#MesAdresses <- c("4 place Jussieu Paris","école Polytechnique, Palaiseau", "35000 France","Rennes")
-#coords = geocodeGratuit(MesAdresses)
-
-#dio = as.data.frame(df %>% group_by(nom_region)%>% summarise(count = n()))
-#coord = as.data.frame(getCoordonneesRegion(dio))
-#dio$lon = coord$lon
-#dio$lat = coord$lat
-
-
-
-#leaflet() %>% setView(
-  #lng = geocodeGratuit("France")[1,1],
-  #lat = geocodeGratuit("France")[1,2],
-  #zoom = 5
-#) %>% addProviderTiles(providers$Stamen.TonerLite, options = providerTileOptions(noWrap = TRUE)) #%>%
-#addMarkers(lat = ~lat)
-
-
-
-#library(doParallel)
-#set.seed(142)
-#cl <- makeCluster(4)
-#registerDoParallel(cl)
-#dd =df_leaflet(data, "Assurance")
-#stopCluster(cl)
-
-#geocodeGratuit(unique(dd$nom_commune[1:240]))#
-
-#dd %>% leaflet() %>%
-  #setView(lng = 1.888334, lat = 46.60335, zoom = 5)  %>% #setting the view over ~ center of North America
-  #addTiles() %>%
-  #addMarkers(lng = ~lon,
-             #lat = ~lat,
-             #popup = ~paste(nom_region," ",count))

@@ -18,18 +18,31 @@ sidebar <- dashboardSidebar(
                      choices = list("Domaine" = "code_secteur",
                                     "Nature Contrat" = "code_nature_contrat",
                                     "Type Contrat" = "code_type_contrat")),
-        menuItem("Analyse temporelle", icon = icon("th"), tabName = "analyse"),
+
+        radioButtons(inputId = "filtreAnne",
+                     label = "Annee",
+                     choices = list("All" = "All",
+                                    "2021" = "2021",
+                                    "2022" = "2022")),
+
         menuItem("Carte", icon = icon("globe"), tabName = "map", badgeLabel = "geo", badgeColor = "green"),
-        #menuItem("Dimension", icon = icon("th"),
-                 #menuSubItem("Nature Contrat", tabName = "entreprise")),
+
         menuItem("Données", icon = icon("th"), tabName = "dimension"),
-        menuItem("Analyse corpus", icon = icon("th"), tabName = "statistique"),
+
+        menuItem("Analyse corpus", icon = icon("th"),
+                 menuSubItem("Frequence de mots", tabName = "statistique"),
+                 menuSubItem("Analyse correspondance", tabName = "AC"),
+                 menuSubItem("Clustering", tabName = "clustering"),
+                 menuSubItem("LDA", tabName = "lda")),
+
         numericInput(inputId = "select_topn",
                      label = "Nombre d'occurence",
                      value = 10, min = 3, max = 30, step=1),
-        selectInput("secteur","Domaine d'activité",choices = unique(getPost()$libelle_secteur),selected = 'Assurance'),
-        #sliderInput("max","Maximum Number of Words:", min = 1,  max = 300,  value = 100),
+
+        selectInput("secteur","Domaine d'activité",choices = unique(c("Tous les domaines",getPost()$libelle_secteur)),selected = 'Tous les domaines'),
+
         menuItem("Charger Données", icon = icon("th"), tabName = "data"),
+
         actionButton("showData", "Show client data")
     )
 )
@@ -45,7 +58,7 @@ body <- dashboardBody(
                 column(12,selectInput("domaine","Domaine d'activité",choices = unique(getDataFromTable('secteursActivites')$libelle),selected = 'Assurance'))
             )
             #verbatimTextOutput("corpusdataText")
-            ),
+    ),
 
     tabItems(
         tabItem(tabName = "dashboard",
@@ -60,50 +73,63 @@ body <- dashboardBody(
                     box(width=6, plotOutput("plot1", height = 250)),
                     box(width = 6, plotOutput("plot3", height = 250)),
                     box(width = 6, plotOutput("plot2", height = 250)),
-
-
+                    box(width = 6, plotOutput("plot4", height = 250)),
                 )
         ),
 
         tabItem(tabName = "map",
-                box(width = 12, leafletOutput("mymap", height = 650)),
-                #box(width = 6, leafletOutput("leaflet")),
-                #box(width = 6, leafletOutput("leaflet"))
-                ),
+                box(width = 12, leafletOutput("mymap", height = 650))
+        ),
 
         tabItem(tabName = "dimension",
                 box(width=12,
                     fluidRow(
                         column(12,
                                mainPanel( width=12,
-                                   tabsetPanel(id = "theTabs",
-                                               tabPanel("Emploi", dataTableOutput("emploiTable"), value="TabSecteur"),
-                                               tabPanel("Entreprise", dataTableOutput("entrepriseTable")),
-                                               tabPanel("Secteur", dataTableOutput("secteurTable"), value="TabSecteur"),
-                                               tabPanel("Nature contrat", dataTableOutput("NatureContratTable"), value="Tab"),
-                                               tabPanel("Type contrat", dataTableOutput("typeContratTable"),  value = "type contrat"),
-                                               tabPanel("Commune", dataTableOutput("communeTable"), value = "commune"),
-                                               tabPanel("Departement", dataTableOutput("departementTable"),  value = "departement"),
-                                               tabPanel("Region", dataTableOutput("regionTable"),  value = "region")
-                                   )
+                                          tabsetPanel(id = "theTabs",
+                                                      tabPanel("Emploi", dataTableOutput("emploiTable"), value="TabSecteur"),
+                                                      tabPanel("Entreprise", dataTableOutput("entrepriseTable")),
+                                                      tabPanel("Secteur", dataTableOutput("secteurTable"), value="TabSecteur"),
+                                                      tabPanel("Nature contrat", dataTableOutput("NatureContratTable"), value="Tab"),
+                                                      tabPanel("Type contrat", dataTableOutput("typeContratTable"),  value = "type contrat"),
+                                                      tabPanel("Commune", dataTableOutput("communeTable"), value = "commune"),
+                                                      tabPanel("Departement", dataTableOutput("departementTable"),  value = "departement"),
+                                                      tabPanel("Region", dataTableOutput("regionTable"),  value = "region")
+                                          )
                                )
                         )
                     ),
                 ),
         ),
+        tabItem(tabName="AC",
+                box(width=8, plotOutput("plot_s2", height = 250)),
+                box(width=4, sliderInput("max","Maximum Number of Words:", min = 1,  max = 300,  value = 100)),
+                box(width=8, plotly::plotlyOutput("plot_ac", height = 330)),
+                box(width=4,
+                    selectInput(
+                        inputId = "domaine",
+                        label = "Liste des domaines d'activités:",
+                        choices = unique(getPost()$code_libellesecteur),
+                        selected = 99,
+                        size = 13,
+                        selectize = FALSE)
+                ),
+        ),
+
         tabItem(tabName = "statistique",
                 box(width=12, title="Occurences de mots",
                     fluidRow(
                         column(6,plotly::plotlyOutput("plot_s1")),
                         column(6, dataTableOutput("table1"))
-                        #column(6, plotOutput("plot_s2"))
                     )
                 ),
-                #box(width=6, plotlyOutput("plot_s4", height = 300))
-
         )
     ),
     useShinyjs()
 )
 
 dashboardPage(header, sidebar, body, skin = "green")
+
+
+
+############## fin UI##########
