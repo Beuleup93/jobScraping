@@ -15,14 +15,14 @@ sidebar <- dashboardSidebar(
     sidebarMenu(
         menuItem("Tableau de bord", tabName = "dashboard",icon = icon("dashboard")),
         radioButtons(inputId = "filtreID",
-                     label = "Filtre",
+                     label = "Filtres",
                      choices = list("Domaine" = "code_secteur",
-                                    "Nature Contrat" = "code_nature_contrat",
-                                    "Type Contrat" = "code_type_contrat")),
+                                    "Nature du contrat" = "code_nature_contrat",
+                                    "Type de contrat" = "code_type_contrat")),
 
         radioButtons(inputId = "filtreAnne",
-                     label = "Annee",
-                     choices = list("All" = "All",
+                     label = "Année",
+                     choices = list("Toute année confondue" = "All",
                                     "2021" = 2021,
                                     "2022" = 2022)),
 
@@ -30,35 +30,35 @@ sidebar <- dashboardSidebar(
 
         menuItem("Données", icon = icon("th"), tabName = "dimension"),
 
-        menuItem("Analyse corpus", icon = icon("th"),
-                 menuSubItem("Frequence de mots", tabName = "statistique"),
+        menuItem("Analyse de corpus", icon = icon("th"),
+                 menuSubItem("Fréquence de mots", tabName = "statistique"),
                  menuSubItem("Association de mots", tabName = "association"),
-                 menuSubItem("Analyse correspondance", tabName = "AC"),
+                 menuSubItem("Analyse de correspondances", tabName = "AC"),
                  menuSubItem("LDA", tabName = "lda"),
                  menuSubItem("Apprentisage supervisé", tabName = "app")
                  ),
 
         numericInput(inputId = "select_topn",
-                     label = "Nombre d'occurence",
+                     label = "Nombre d'occurences",
                      value = 10, min = 3, max = 30, step=1),
 
         selectInput("secteur","Domaine d'activité",choices = unique(c("Tous les domaines",getPost()$libelle_secteur)),selected = 'Tous les domaines'),
 
-        menuItem("Charger Données", icon = icon("th"), tabName = "data"),
+        menuItem("Chargement de données", icon = icon("th"), tabName = "data"),
 
         actionButton("showData", "Show client data")
     )
 )
 
 body <- dashboardBody(
-    bsModal(id = "corpusData", title = "Corpus Data",
+    bsModal(id = "corpusData", title = "Corpus de données",
             trigger = "showData",
             fluidRow(
-                column(6,numericInput(inputId = "Debut", label = "Debut Plage", value = 0, min = 0, max = 1000, step=1)),
-                column(6,numericInput(inputId = "Fin", label = "Fin de plage", value = 149, min = 50, max = 1000, step=1))
+                column(6,numericInput(inputId = "Debut", label = "Début de la plage", value = 0, min = 0, max = 1000, step=1)),
+                column(6,numericInput(inputId = "Fin", label = "Fin de la plage", value = 149, min = 50, max = 1000, step=1))
             ),
             fluidRow(
-                column(12,selectInput("domaine","Domaine d'activité",choices = unique(getDataFromTable('secteursActivites')$libelle),selected = 'Assurance'))
+                column(12,selectInput("domaine","Domaine d'activités",choices = unique(getDataFromTable('secteursActivites')$libelle),selected = 'Assurance'))
             )
             #verbatimTextOutput("corpusdataText")
     ),
@@ -106,7 +106,7 @@ body <- dashboardBody(
         ),
         tabItem(tabName="AC",
                 box(width=8, plotOutput("plot_s2", height = 250)),
-                box(width=4, sliderInput("max","Maximum Number of Words:", min = 1,  max = 300,  value = 100)),
+                box(width=4, sliderInput("max","Nombre maximal de mots:", min = 1,  max = 300,  value = 100)),
                 box(width=8, plotly::plotlyOutput("plot_ac", height = 330)),
                 box(width=4,
                     selectInput(
@@ -130,8 +130,8 @@ body <- dashboardBody(
         tabItem(tabName="association",
                 box(width=12,
                     fluidRow(
-                        column(4,selectInput("field","Champ de corpus",choices = c("description","compétence"),selected = 'missions')),
-                        column(4,selectInput("mots","choisir mot",choices = c("gestion","techniques","formation","expérience","poste","missions","outils","qualité","formation","équipe","service","informatique","assurance","charge","projet","développement","travail","suivi","client"),selected = 'missions')),
+                        column(4,selectInput("field","Champs de corpus",choices = c("description","compétence"),selected = 'missions')),
+                        column(4,selectInput("mots","choisir un mot",choices = c("gestion","techniques","formation","expérience","poste","missions","outils","qualité","formation","équipe","service","informatique","assurance","charge","projet","développement","travail","suivi","client"),selected = 'missions')),
                         column(4, sliderInput(inputId = "plage",label = "Plage de mots", value = 20, min = 10, max = 200, step=1)),
                     )
                 ),
@@ -144,7 +144,7 @@ body <- dashboardBody(
         tabItem(tabName="lda",
                 box(width=12,
                     fluidRow(
-                        column(4,selectInput("kchoice","Champ de corpus",choices = c("fixed k","find best k"),selected = 'find best k')),
+                        column(4,selectInput("kchoice","Champs de corpus",choices = c("Choisir le k","Trouver le meilleur k"),selected = "Trouver le meilleur k")),
                         column(4, sliderInput(inputId = "kfixed",label = "Nombre de topics", value = 2, min = 2, max = 8, step=1)),
                         column(4, sliderInput(inputId = "iter",label = "Nombre d'iterations", value = 100, min = 100, max = 1000, step=50)),
                     )
@@ -159,8 +159,8 @@ body <- dashboardBody(
         tabItem(tabName="app",
                 box(width=12,
                     fluidRow(
-                        column(4, selectInput("modalite1","One versus All",choices = unique(c("Choice one versus all",getPost()$libelle_secteur)),selected = 'Choice one versus all')),
-                        column(4,selectInput("algo","Algorithme",choices = unique(c('decision tree', 'svm','Choice algorithm')),selected = 'Choice algorithm')),
+                        column(4, selectInput("modalite1","Une versus les autres",choices = unique(c("Une versus les autres",getPost()$libelle_secteur)),selected = 'Une versus les autres')),
+                        column(4,selectInput("algo","Algorithmes",choices = unique(c('decision tree', 'svm','Choix d\'algorithme')),selected = 'Choix d\'algorithme')),
                         column(4, sliderInput(inputId = "iter",label = "Nombre d'iterations", value = 100, min = 100, max = 1000, step=50)),
                     )
                 ),

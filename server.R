@@ -62,7 +62,7 @@ shinyServer(function(input, output, session) {
 
   v <- reactive({
     shiny::validate(
-      need(input$select_topn >= 2 & input$select_topn <= 50, "S'il vous plait veuiller choisir un nombre entre 3 et 50")
+      need(input$select_topn >= 2 & input$select_topn <= 50, "S'il vous plait veuillez choisir un nombre entre 3 et 50")
     )
   })
 
@@ -109,19 +109,25 @@ shinyServer(function(input, output, session) {
             summarise(count = n()) %>%
             ggplot() +
             geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#226D68", width=.6) +
-            ggtitle("Repartition des emplois selon le secteur d'activité")
+            xlab("Code du secteur") +
+            ylab("Nombre d'offres") +
+            ggtitle("Répartition des emplois selon le secteur d'activité")
 
         }else if(input$filtreID=="code_nature_contrat"){
           getReactiveData2() %>% group_by(libelle_nature)%>%
             summarise(count = n()) %>%
             ggplot() +
             geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#226D68", width=.6) +
-            ggtitle("Repartition des emplois selon la nature des contrat")
+            xlab("Nombre d'offres") +
+            ylab("Nature du contrat") +
+            ggtitle("Répartition des emplois selon la nature des contrats")
 
         }else{
           getReactiveData2() %>% ggplot(aes(x = code_type_contrat)) +
-                geom_bar(fill="#26474E") +
-                ggtitle("Repartition des emplois selon le type de contrat")
+                geom_bar(fill="#226D68") +
+                xlab("Type de contrat") +
+                ylab("Nombre d'offres") +
+                ggtitle("Répartition des emplois selon le type de contrat")
         }
 
     })
@@ -130,8 +136,10 @@ shinyServer(function(input, output, session) {
         getReactiveData() %>% group_by(nom_region) %>%
           summarise(count = n()) %>%
           ggplot() +
-          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#23798E", width=.6) +
-          ggtitle("Repartition des emplois selon les régions")
+          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#226D68", width=.6) +
+          xlab("Nombre d'offres") +
+          ylab("Régions") +
+          ggtitle("Répartition des emplois selon les régions")
     })
 
     output$plot3 <- renderPlot({
@@ -140,8 +148,10 @@ shinyServer(function(input, output, session) {
           summarise(count = n()) %>%
           filter(libelle_qualification != 'NULL') %>%
           ggplot() +
-          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#375D81", width=.6) +
-          ggtitle("Repartition des emplois selon la qualification")
+          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#226D68", width=.6) +
+          xlab("Nombre d'offres") +
+          ylab("Qualification") +
+          ggtitle("Répartition des emplois selon la qualification")
     })
 
 
@@ -167,9 +177,11 @@ shinyServer(function(input, output, session) {
         ylab("count") +
         coord_flip() +
         theme_minimal() +
-        ggtitle(paste("Top mots", input$secteur)) +
+        ggtitle(paste("Top des mots","de", input$secteur)) +
+        ylab("Nombre d'occurences") +
+        xlab("Mots") +
         geom_blank()+
-        scale_fill_manual(values=c("#23798E"))
+        scale_fill_manual(values=c("#226D68"))
       ggplotly(p)
     })
 
@@ -268,13 +280,13 @@ shinyServer(function(input, output, session) {
       ylab("composante 2")+
       xlab("composante 1")+
       coord_equal(xlim=c(-1,1), ylim=c(-1,1))+
-      ggtitle(paste("Analyse des correspondance et visualisation")) +
-      scale_fill_manual(values=c("#23798E"))
+      ggtitle(paste("Analyse des correspondances et visualisation")) +
+      scale_fill_manual(values=c("#226D68"))
     ggplotly(p)
   })
 
   output$plot_lda <- renderPlot({
-    if(input$kchoice=='fixed k'){
+    if(input$kchoice=='Choisir le k'){
       lda_fixed_k(getReactiveData(),k=input$kfixed, iter=input$iter)
     }else{
       lda_best_k(getReactiveData(), iter=input$iter)
