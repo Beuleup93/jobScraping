@@ -10,7 +10,6 @@ library(leaflet)
 library(plotly)
 library(ggthemes)
 library(wordcloud)
-library(wordcloud2)
 
 
 suppressPackageStartupMessages(library(googleVis))
@@ -18,18 +17,35 @@ source("helpersApiBd.R")
 
 shinyServer(function(input, output, session) {
 
+  getReactivedfToCorpus <- reactive({
+    data <- dfToCorpusField(getPost(), input$field, input$plage)
+    return(data)
+  })
+
   getReactiveData <- reactive({
     data <- getPost(input$secteur)
+    if(input$filtreAnne != 'All'){
+      data = decompose_date(data)
+      return(data[data$annee==input$filtreAnne,])
+    }
     return(data)
   })
 
   getReactiveData2 <- reactive({
     data <- getPost()
+    if(input$filtreAnne != 'All'){
+      data = decompose_date(data)
+     return(data[data$annee==input$filtreAnne,])
+    }
     return(data)
   })
 
   getCorpusData <- reactive({
     data <- processingCorpus(getReactiveData())
+    if(input$filtreAnne != 'All'){
+      data = decompose_date(data)
+      return(data[data$annee==input$filtreAnne,])
+    }
     return(data)
   })
 
@@ -57,27 +73,25 @@ shinyServer(function(input, output, session) {
 
     # icons
     output$entreprises <- renderInfoBox({
-        infoBox("entreprises", getNumberOfRows("entreprise",input$secteur,"ref_entreprise")[1,],
+        infoBox("entreprises", getNumberOfRows2(domaine=input$secteur,colonne_name = 'ref_entreprise',annee=input$filtreAnne),
                 icon = icon("calendar", lib = "font-awesome"),
                 color = "blue",
                 fill = TRUE)
     })
 
     output$emplois <- renderInfoBox({
-        infoBox("emplois", getNumberOfRows("POST", input$secteur, "ID")[1,],
+        infoBox("emplois", getNumberOfRows2(domaine=input$secteur,colonne_name ='ID',annee=input$filtreAnne),
                 icon = icon("user"),
                 color = "purple",
                 fill = TRUE)
     })
 
     output$percentNew <- renderInfoBox({
-        infoBox("Domaines",getDistinctSecteur("POST","code_secteur")[1,],
+        infoBox("Domaines",getNumberOfRows2(domaine=input$secteur,colonne_name = 'code_secteur',annee=input$filtreAnne),
             icon = icon("pie-chart"),
             color = "yellow",
             fill = TRUE)
     })
-
-
 
     output$mymap <- renderLeaflet({
 
@@ -94,14 +108,14 @@ shinyServer(function(input, output, session) {
           getReactiveData2() %>% group_by(code_secteur)%>%
             summarise(count = n()) %>%
             ggplot() +
-            geom_col(aes(x = code_secteur, y= count), fill = "#226D68", width=.6) +
+            geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#226D68", width=.6) +
             ggtitle("Repartition des emplois selon le secteur d'activité")
 
         }else if(input$filtreID=="code_nature_contrat"){
           getReactiveData2() %>% group_by(libelle_nature)%>%
             summarise(count = n()) %>%
             ggplot() +
-            geom_col(aes(y = libelle_nature, x= count), fill = "#226D68", width=.6) +
+            geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#226D68", width=.6) +
             ggtitle("Repartition des emplois selon la nature des contrat")
 
         }else{
@@ -116,10 +130,9 @@ shinyServer(function(input, output, session) {
         getReactiveData() %>% group_by(nom_region) %>%
           summarise(count = n()) %>%
           ggplot() +
-          geom_col(aes(x = count, y= nom_region), fill = "#23798E", width=.6) +
+          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#23798E", width=.6) +
           ggtitle("Repartition des emplois selon les régions")
     })
-
 
     output$plot3 <- renderPlot({
         getReactiveData() %>%
@@ -127,19 +140,10 @@ shinyServer(function(input, output, session) {
           summarise(count = n()) %>%
           filter(libelle_qualification != 'NULL') %>%
           ggplot() +
-          geom_col(aes(x = count, y=libelle_qualification), fill = "#375D81", width=.6) +
+          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#375D81", width=.6) +
           ggtitle("Repartition des emplois selon la qualification")
     })
 
-    output$plot3 <- renderPlot({
-      getReactiveData() %>%
-        group_by(libelle_qualification)%>%
-        summarise(count = n()) %>%
-        filter(libelle_qualification != 'NULL') %>%
-        ggplot() +
-        geom_col(aes(x = count, y=libelle_qualification), fill = "#375D81", width=.6) +
-        ggtitle("Repartition des emplois selon la qualification")
-    })
 
     output$plot4 <- renderPlot({
       #df <-getReactiveData()
@@ -169,6 +173,13 @@ shinyServer(function(input, output, session) {
       ggplotly(p)
     })
 
+    output$table_assoc <- renderDataTable({
+      # Validate for table
+      tmp = getReactivedfToCorpus()
+      d = as.data.frame(findAssocs(tmp$dtm, terms = input$mots, corlimit = 0.3))
+      d
+    })
+
     output$table1 <- renderDataTable({
       # Validate for table
       v()
@@ -178,7 +189,7 @@ shinyServer(function(input, output, session) {
     output$plot_s2 <- renderPlot({
       tmp = getCorpusData()
       dico_terme = tmp$dict_terme
-      wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=10,max.word=input$max,colors = brewer.pal(8,'Dark2'))
+      wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=5,max.word=input$max,colors = brewer.pal(8,'Dark2'))
     })
 
     # DataTable

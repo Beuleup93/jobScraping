@@ -464,7 +464,7 @@ loadCompany <- function(df){
 #_______________________________________________________________________________
 
 # Recuperer le nombre de ligne chargée
-getNumberOfRows<- function(table, domaine="Tous les domaines", colonne_name=NA){
+getNumberOfRows<- function(table, domaine="Tous les domaines", colonne_name=NA, annee){
   if(domaine=='Tous les domaines'){
     query <- sprintf("SELECT COUNT(*) FROM %s", paste(table, collapse = ", "))
   }else{
@@ -479,8 +479,18 @@ getNumberOfRows<- function(table, domaine="Tous les domaines", colonne_name=NA){
   dbDisconnect(db)
   return(res)
 }
-#getNumberOfRows("entreprise","Assurance", "ref_entreprise")
+getNumberOfRows2 <- function(domaine="Tous les domaines", colonne_name=NA, annee='All'){
+  df = getPost(domaine)
+  df = decompose_date(df)
 
+  if(annee != 'All'){
+    df = df[df$annee==annee,]
+  }
+  if(!is.na(colonne_name)){
+    nb <- length(unique(df[,c(colonne_name)]))
+  }
+  return(nb)
+}
 
 getDistinctSecteur<- function(table, colonne){
   db <- getSingleConnexion()
@@ -489,6 +499,8 @@ getDistinctSecteur<- function(table, colonne){
   dbDisconnect(db)
   return(res)
 }
+
+
 
 getDataFromTable<- function(table){
   db <- getSingleConnexion()
@@ -500,14 +512,10 @@ getDataFromTable<- function(table){
   return(res)
 }
 
-
-
-dd = getDataFromTable("secteursActivites")
-
 # repartition des jobs selon les secteurs
-getPost<- function(domaine="Tous les domaines"){
+getPost<- function(domaine = "Tous les domaines"){
   if(domaine == 'Tous les domaines'){
-    query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation,p.experienceExige, s.libelle as libelle_secteur,
+    query <- sprintf("SELECT p.ID, p.ref_entreprise, p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation,p.experienceExige, s.libelle as libelle_secteur,
                     p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type, r.nom_region,
                     r.code_region, d.code_dept, d.nom_dept, c.code_commune, c.nom_commune, e.nom, e.description as summary, e.url,e.logo FROM POST p
                             INNER JOIN entreprise e ON p.ref_entreprise = e.nom
@@ -518,7 +526,7 @@ getPost<- function(domaine="Tous les domaines"){
                             INNER JOIN departement d ON c.code_dept = d.code_dept
                             INNER JOIN region r ON d.code_region = r.code_region")
   }else{
-    query <- sprintf("SELECT p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation, p.experienceExige, s.libelle as libelle_secteur,
+    query <- sprintf("SELECT p.ID,p.ref_entreprise, p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation, p.experienceExige, s.libelle as libelle_secteur,
                     p.code_nature_contrat,n.libelle as libelle_nature, p.code_type_contrat, t.libelle as libelle_type, r.nom_region,
                     r.code_region, d.code_dept, d.nom_dept, c.code_commune, c.nom_commune, e.nom, e.description as summary, e.url,e.logo FROM POST p
                             INNER JOIN entreprise e ON p.ref_entreprise = e.nom
@@ -553,7 +561,8 @@ processingCorpus <- function(df, secteur_activite=NA){
     #df = df[df$libelle_secteur==secteur_activite,]
   #}
   # Joindre la colonne description intitule et competences postes
-  df = unite(df, text, description, competences, sep = " ")
+  #df = unite(df, text, description, competences, sep = " ")
+  df$text = paste(df$description, df$competences, sep=" ")
 
   # tible data frame
   df_tible <- tibble(line=1:nrow(df),text=df$text)
@@ -643,17 +652,36 @@ df_leaflet<- function(df){
   return(df)
 }
 
-clean_corpus <- function(corpus){
+dfToCorpusField <- function(df, field="description", plage=100){
+  df = head(n=plage, df)
+  if(field =="description"){
+    all_text_field <- c(df$description)
+  }else if(field=="compétence"){
+    all_text_field <- c(df$competences)
+  }else{
+    all_text_desc <- paste(df$description, collapse = "")
+    all_competences<- paste(df$competences, collapse = "")
+    all_text_field <- c(all_text_desc,all_competences)
+  }
+  # Clean text field
+  all_text_field <- VectorSource(all_text_field)
+  all_text_corpus <- VCorpus(all_text_field)
+  all_clean <- clean_corpus(all_text_corpus)
+  return(list(dtm=DocumentTermMatrix(all_clean), tdm=TermDocumentMatrix(all_clean)))
+}
+
+clean_corpus <- function(corpus, field = "description"){
   stopwordd = as.data.frame(jsonlite::fromJSON("stop_words_french.json"))
   colnames(stopwordd) = c("stwd")
   corpus <- tm::tm_map(corpus, removePunctuation)
   corpus <- tm::tm_map(corpus, stripWhitespace)
   corpus <- tm::tm_map(corpus, removeNumbers)
   corpus <- tm::tm_map(corpus, content_transformer(tolower))
-  corpus <- tm::tm_map(corpus, removeWords,c(stopwordd$stwd, "emploi","les","des","dun","dune","daux","dau"))
+  corpus <- tm::tm_map(corpus, removeWords, stopwords::stopwords(language = "fr"))
+  corpus <- tm::tm_map(corpus,removeWords,c("contre","cpg","csv","€jour","audelà","aujourdhui","auquel","emploi","ère","cqrs","connaissancesexpertise","les","des","dun","dune","daux","dau","cétait"))
+  #corpus <- tm::tm_map(corpus, stemDocument)
   return(corpus)
 }
-
 
 tdm_dtm<- function(clean_corp){
   # generate TDM (terme en ligne et document en clonne)
@@ -749,44 +777,5 @@ Graph_Experience_Qualification = function(posts, secteur='Tous les dommaines'){
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-
-
-lda_ <- function(df){
-
-}
-
-res = processingCorpus(head(n=100,df))
-dtm_matrix = as.matrix(res$matrice_dt)
-
-lda_out <- LDA(
-  dtm_matrix,
-  k = 2,
-  method = "Gibbs",
-  control = list(seed = 42)
-)
-lda_out
-glimpse(lda_out)
-
-lda_topics <- lda_out %>%
-  tidy(matrix = "beta")
-
-lda_topics %>%
-  arrange(desc(beta))
-
-##################@
-lda_topics <- LDA(dtm_matrix,k = 4,method = "Gibbs",control = list(seed = 42)) %>%
-  tidy(matrix = "beta")
-
-word_probs <- lda_topics %>%
-  group_by(topic) %>%
-  top_n(15, beta) %>%
-  ungroup() %>%
-  mutate(term2 = fct_reorder(term, beta))
-
-################
-ggplot(word_probs, aes(term2,beta,fill = as.factor(topic)))+
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
-  coord_flip()
 
 

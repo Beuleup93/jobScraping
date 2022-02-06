@@ -4,6 +4,7 @@ library(shinyBS)
 library(leaflet)
 library(DT)
 library(shinyjs)
+library(tidyr)
 
 source("helpersApiBd.R")
 header <- dashboardHeader(title = "JobAnalysis",
@@ -22,8 +23,8 @@ sidebar <- dashboardSidebar(
         radioButtons(inputId = "filtreAnne",
                      label = "Annee",
                      choices = list("All" = "All",
-                                    "2021" = "2021",
-                                    "2022" = "2022")),
+                                    "2021" = 2021,
+                                    "2022" = 2022)),
 
         menuItem("Carte", icon = icon("globe"), tabName = "map", badgeLabel = "geo", badgeColor = "green"),
 
@@ -120,19 +121,24 @@ body <- dashboardBody(
         tabItem(tabName = "statistique",
                 box(width=12, title="Occurences de mots",
                     fluidRow(
-                        column(6,plotly::plotlyOutput("plot_s1")),
+                        column(6, plotly::plotlyOutput("plot_s1")),
                         column(6, dataTableOutput("table1"))
                     )
                 ),
         ),
-
         tabItem(tabName="association",
                 box(width=12,
                     fluidRow(
-                        column(6,selectInput("words","choisir mot",choices = c("missions","formation"),selected = 'missions')),
-                        column(6, sliderInput(inputId = "plage",label = "Plage de mots", value = 20, min = 10, max = 200, step=1))
+                        column(4,selectInput("field","Champ de corpus",choices = c("description","compétence"),selected = 'missions')),
+                        column(4,selectInput("mots","choisir mot",choices = c("gestion","techniques","formation","expérience","poste","missions","outils","qualité","formation","équipe","service","informatique","assurance","charge","projet","développement","travail","suivi","client"),selected = 'missions')),
+                        column(4, sliderInput(inputId = "plage",label = "Plage de mots", value = 20, min = 10, max = 200, step=1)),
                     )
                 ),
+                box(width = 12,
+                    fluidRow(
+                        column(12, dataTableOutput("table_assoc")),
+                    )
+                )
         )
     ),
     useShinyjs()
