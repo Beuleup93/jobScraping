@@ -777,5 +777,56 @@ Graph_Experience_Qualification = function(posts, secteur='Tous les dommaines'){
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
+lda_fixed_k <- function(df, k=2, iter=100){
+  res = processingCorpus(head(n=100,df))
+  dtm = as.matrix(res$matrice_dt)
+  # Initial run
+  mod = LDA(x=dtm, method="Gibbs", k=k,
+            control=list(alpha=0.5, seed=12345, iter=iter, keep=1))
+  # Resumed run
+  mod2 = LDA(x=dtm, model=mod,
+             control=list(thin=1, seed=10000, iter=iter)) %>%
+    tidy(matrix = "beta")
+
+  word_probs <- mod2 %>%
+    group_by(topic) %>%
+    top_n(15, beta) %>%
+    ungroup() %>%
+    mutate(term2 = fct_reorder(term, beta))
+
+  ggplot(word_probs, aes(term2,beta,fill = as.factor(topic)))+
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free") +
+    coord_flip()
+}
+
+lda_best_k <- function(df,iter=100){
+  res = processingCorpus(head(n=100,df))
+  dtm = as.matrix(res$matrice_dt)
+  mod_log_lik = numeric(10)
+  mod_perplexity = numeric(10)
+  for (i in 2:10) {
+    mod = LDA(dtm, k=i, method="Gibbs",
+              control=list(alpha=0.5, iter=iter, seed=12345, thin=1))
+    mod_log_lik[i] = logLik(mod)
+    mod_perplexity[i] = perplexity(mod, dtm)
+  }
+  number_clusters = 2:10
+  ggplot(data.frame(number_of_cluster=2:10,mod_perplexity=mod_perplexity[2:10]),
+         aes(x= number_of_cluster, y=mod_perplexity))+
+    geom_point(size=2, shape=23,color='red')+
+    geom_line()
+}
+
+
+
+
+
+
+
+
+
+
+
 
 

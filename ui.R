@@ -34,8 +34,9 @@ sidebar <- dashboardSidebar(
                  menuSubItem("Frequence de mots", tabName = "statistique"),
                  menuSubItem("Association de mots", tabName = "association"),
                  menuSubItem("Analyse correspondance", tabName = "AC"),
-                 menuSubItem("Clustering", tabName = "clustering"),
-                 menuSubItem("LDA", tabName = "lda")),
+                 menuSubItem("LDA", tabName = "lda"),
+                 menuSubItem("Apprentisage supervisé", tabName = "app")
+                 ),
 
         numericInput(inputId = "select_topn",
                      label = "Nombre d'occurence",
@@ -65,10 +66,10 @@ body <- dashboardBody(
     tabItems(
         tabItem(tabName = "dashboard",
                 fluidRow(
-                    infoBoxOutput(width = 3, "entreprises"),
-                    infoBoxOutput(width = 3, "emplois"),
-                    infoBoxOutput(width = 3, "percentNew"),
-                    infoBox(width = 3, "Shiny version", "0.12",icon = icon("desktop"))
+                    infoBoxOutput(width = 4, "entreprises"),
+                    infoBoxOutput(width = 4, "emplois"),
+                    infoBoxOutput(width = 4, "percentNew"),
+                    #infoBox(width = 3, "Shiny version", "0.12",icon = icon("desktop"))
                 ),
 
                 fluidRow(
@@ -139,7 +140,38 @@ body <- dashboardBody(
                         column(12, dataTableOutput("table_assoc")),
                     )
                 )
+        ),
+        tabItem(tabName="lda",
+                box(width=12,
+                    fluidRow(
+                        column(4,selectInput("kchoice","Champ de corpus",choices = c("fixed k","find best k"),selected = 'find best k')),
+                        column(4, sliderInput(inputId = "kfixed",label = "Nombre de topics", value = 2, min = 2, max = 8, step=1)),
+                        column(4, sliderInput(inputId = "iter",label = "Nombre d'iterations", value = 100, min = 100, max = 1000, step=50)),
+                    )
+                ),
+                box(width = 12,
+                    fluidRow(
+                        column(12, plotOutput("plot_lda", height=400)),
+                    )
+                )
+        ),
+
+        tabItem(tabName="app",
+                box(width=12,
+                    fluidRow(
+                        column(4, selectInput("modalite1","One versus All",choices = unique(c("Choice one versus all",getPost()$libelle_secteur)),selected = 'Choice one versus all')),
+                        column(4,selectInput("algo","Algorithme",choices = unique(c('decision tree', 'svm','Choice algorithm')),selected = 'Choice algorithm')),
+                        column(4, sliderInput(inputId = "iter",label = "Nombre d'iterations", value = 100, min = 100, max = 1000, step=50)),
+                    )
+                ),
+                box(width = 12,
+                    fluidRow(
+                        column(12, plotOutput("plot", height=400)),
+                    )
+                )
         )
+
+
     ),
     useShinyjs()
 )

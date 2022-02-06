@@ -273,4 +273,12 @@ shinyServer(function(input, output, session) {
     ggplotly(p)
   })
 
+  output$plot_lda <- renderPlot({
+    if(input$kchoice=='fixed k'){
+      lda_fixed_k(getReactiveData(),k=input$kfixed, iter=input$iter)
+    }else{
+      lda_best_k(getReactiveData(), iter=input$iter)
+    }
+  })
+
 })
