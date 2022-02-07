@@ -18,12 +18,17 @@ library(lubridate)
 library(GGally)
 library(topicmodels)
 library(forcats)
-
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(kernlab)
+library(caret)
+library(doParallel)
 
 
 `%>%` <- magrittr::`%>%`
 
-# Parametres de connexion API
+# PARAMETRE DE CONNEXION API POLE EMPLOI
 options(api = list(
   "urlToken" = "https://entreprise.pole-emploi.fr/connexion/oauth2/access_token?realm=/partenaire",
   "urlRegions" = "https://geo.api.gouv.fr/regions",
@@ -35,7 +40,7 @@ options(api = list(
   "scope" = "api_offresdemploiv2 application_PAR_rwebscraping_d2ae1885e3c2634ba1cef0fddd4ae4e06ca365f9f4834d9327e628c27bb0003d o2dsoffre"
 ))
 
-# Parametres de connexion BD
+# PARAMETRE DE CONNEXION BASE DE DONNEE MYSQL, A ADAPTER SELON LES INFORMATIONS DE CONNEXIONS
 options(mysql = list(
   "host" = "127.0.0.1",
   "port" = 8889,
@@ -44,7 +49,7 @@ options(mysql = list(
   "databaseName" = "bd_emploi"
 ))
 
-# Function to connect in BD
+#FONCTION POUR SE CONNECTER À LA BASE DE DONNÉES
 getSingleConnexion <- function(){
   db <- dbConnect(MySQL(),
                   dbname = options()$mysql$databaseName,
@@ -55,7 +60,7 @@ getSingleConnexion <- function(){
   return(db)
 }
 
-# Function to get access token from API
+# FONCTION POUR GENERER UN JETON D'ACCES À L'API
 generateToken <- function(url){
   body = list(grant_type =  options()$api$grant_type,
               client_id = options()$api$client_id,
@@ -66,18 +71,17 @@ generateToken <- function(url){
 }
 
 # Test Acess Token
-r = generateToken(urlToken)
-attributes(r)
-print(httr::content(r))
-print(paste("Token: ",httr::content(r)$access_token))
-print(paste("Expire in:",httr::content(r)$expires_in/60,"min"))
+#r = generateToken(urlToken)
+#attributes(r)
+#print(httr::content(r))
+#print(paste("Token: ",httr::content(r)$access_token))
+#print(paste("Expire in:",httr::content(r)$expires_in/60,"min"))
 
 # Test connexion BD
-con = getSingleConnexion()
-summary(con)
+#con = getSingleConnexion()
+#summary(con)
 
-
-# Code de chargement des données dans la BD
+# CODE DE CHARGEMENT DES REGIONS DANS LA BASE DE DONNÉES
 loadRegionInBdRegionFromApi <- function(){
   # Get Region From DataGouv API
   df = jsonlite::fromJSON(options()$api$urlRegions)
@@ -100,10 +104,7 @@ loadRegionInBdRegionFromApi <- function(){
   dbDisconnect(db)
 }
 
-# Insertion des régions dans la base
-#loadRegionInBdRegionFromApi()
-#__________________________________
-
+# CODE DE CHARGEMENT DES DEPARTEMENTS DANS LA BASE DE DONNÉES
 loadDepartementInBdFromApi<-function(){
   # Get Region From DataGouv API
   df = jsonlite::fromJSON(options()$api$urlDepartement)
@@ -128,10 +129,7 @@ loadDepartementInBdFromApi<-function(){
   dbDisconnect(db)
 }
 
-# Insertion des régions dans la base
-#loadDepartementInBdFromApi()
-#____________________________
-
+#CODE DE CHARGEMENT DES COMMUNES DANS LA BASE DE DONNÉES
 loadCommuneInBdFromApi <- function(){
   # Get Region From DataGouv API
   df = jsonlite::fromJSON(options()$api$urlCommunes)
@@ -159,10 +157,7 @@ loadCommuneInBdFromApi <- function(){
   dbDisconnect(db)
 }
 
-#loadCommuneInBdFromApi(r)
-
-# Insertion des secteurs d'activité dans la base
-#token = generateToken(urlPost)
+# CODE DE CHARGEMENT DES SECTEURS DANS LA BASE DE DONNÉES
 loadSecteurActInBdFromApi<- function(token){
   url ="https://api.emploi-store.fr/partenaire/offresdemploi/v2/referentiel/secteursActivites"
   authorization = sprintf("%s %s", content(token)$token_type, content(token)$access_token)
@@ -188,12 +183,9 @@ loadSecteurActInBdFromApi<- function(token){
   })
   dbDisconnect(db)
 }
-
-# Load Secteur d'activité
-#loadSecteurActInBdFromApi(token)
 #____________________________
 
-# Insertion des types de contrat dans la base
+# FONCTION POUR LE CHARGEMENT DES REGIONS DANS LA BASE DE DONNÉES
 loadTypeContratInBdFromApi<- function(token){
   url = "https://api.emploi-store.fr/partenaire/offresdemploi/v2/referentiel/typesContrats"
   authorization = sprintf("%s %s", content(token)$token_type, content(token)$access_token)
@@ -221,10 +213,7 @@ loadTypeContratInBdFromApi<- function(token){
   dbDisconnect(db)
 }
 
-# Load Secteur d'activité
-#loadTypeContratInBdFromApi(token)
-#____________________________
-
+# CHERCHER UN OBJET NATURE CONTRAT DANS LA BD À PARTIR DE SON LIBELLE
 findNatureContratByLibelle<- function(libelle){
   db <- getSingleConnexion()
   query <- sprintf("SELECT * FROM natureContrat where libelle = '%s'", paste(gsub("'", "", libelle), collapse = ", "))
@@ -235,7 +224,7 @@ findNatureContratByLibelle<- function(libelle){
   return(res)
 }
 
-# Insertion des nature de contrat dans la base
+# FONCTION DE CHARGEMENT DES NATURE DE CONTRAT
 loadNatureContratInBdFromApi<- function(token){
   url = "https://api.emploi-store.fr/partenaire/offresdemploi/v2/referentiel/naturesContrats";
   authorization = sprintf("%s %s", content(token)$token_type, content(token)$access_token)
@@ -262,16 +251,16 @@ loadNatureContratInBdFromApi<- function(token){
   dbDisconnect(db)
 }
 
-#____________________________ JOB
+# CODE DE CHARGEMENT DES OFFRES DEPUIS L'API
 loadJobFromApi<- function(token, rangeDebut=NULL,rangeFin=NULL, secteurActivite=NULL){
   # 01 France, secteur d'activité: 62(Programmation, conseil et autres activités informatiques)
   #26(Fabrication de produits informatiques, électroniques et optiques) 63(service information)
   #61: telecommunication, 60:Programmation et diffusion, 65: assurrance, 72: Recherche-développement scientifique
   url <- sprintf("https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search?paysContinent=01&range=%s-%s&secteurActivite=%s",rangeDebut,rangeFin,secteurActivite)
   #url = "https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search?paysContinent=01&range=300-449&secteurActivite=61"
-  authorization = sprintf("%s %s", content(token)$token_type, content(token)$access_token)
+  authorization = sprintf("%s %s", httr::content(token)$token_type, httr::content(token)$access_token)
   response = GET(url, add_headers(Authorization = authorization), Encoding="UTF-8")
-  df = jsonlite::fromJSON(toJSON(content(response)))
+  df = jsonlite::fromJSON(toJSON(httr::content(response)))
   # On supprime les jobs sans nom d'entreprise ou localisation sans
   df = df$resultats
   df = df[-which(df$entreprise$nom=='NULL' | df$lieuTravail$commune=='NULL'),]
@@ -303,21 +292,28 @@ loadJobFromApi<- function(token, rangeDebut=NULL,rangeFin=NULL, secteurActivite=
   return (list(en = entrepriseDf, dfPost = dfPost))
 }
 
-loadAllJobFromAPI<- function(token, secteurActivite){
-  rangeDebut <- 0
-  rangeFin <- 149
-  while(rangeDebut<200 & rangeDebut < rangeFin){
-    loadJobFromApi(token, rangeDebut, rangeFin, secteurActivite)
-    rangeDebut = rangeFin+1
-    rangeFin = rangeFin+150
-  }
-  print("Chargement terminé")
+loadJobApiInDB<- function(rangeDebut, rangeFin, secteurActivite){
+  token = generateToken(urlToken)
+  code_secteur = findSecteurByLibelle(secteurActivite)$code_secteur
+  loadJobFromApi(token, rangeDebut, rangeFin, code_secteur)
 }
+
+# CHARGEMENT AUTOMATISER DES POST DANS LA BASE DE DONNEES
+#loadAllJobFromAPI<- function(token, secteurActivite){
+#  rangeDebut <- 0
+#  rangeFin <- 149
+#  while(rangeDebut<1000 & rangeDebut < rangeFin){
+#    loadJobFromApi(token, rangeDebut, rangeFin, secteurActivite)
+#    rangeDebut = rangeFin+1
+#   rangeFin = rangeFin+150
+#  }
+#  print("Chargement terminé")
+#}
 #_________Chargement_______
 #r = generateToken(urlPost)
 #loadAllJobFromAPI(r, 86) # 61: telecommunication, 65 Assurance
 
-#__________Verifier que le poste n'existe pas déja dans la base_________________
+# VERIFICATION SI OUI OU NON LE JOB EXISTE DEJA DANS LA BASE
 findPostById <- function(id){
   db <- getSingleConnexion()
   query <- sprintf("SELECT * FROM POST where ID = '%s'", paste(id, collapse = ", "))
@@ -328,6 +324,18 @@ findPostById <- function(id){
   return(res)
 }
 
+# CHERCHER UN OBJET SECTEUR D'ACTIVITE DANS LA BD À PARTIR DE SON LIBELLE
+findSecteurByLibelle <- function(libelle){
+  db <- getSingleConnexion()
+  query <- sprintf("SELECT * FROM secteursActivites where libelle = '%s'", paste(libelle, collapse = ", "))
+  dbSendQuery(db, "SET NAMES utf8mb4;")
+  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
+  res = dbGetQuery(db, query)
+  dbDisconnect(db)
+  return(res)
+}
+
+# CHERCHER UN OBJET COMMUNE DANS LA BD À PARTIR DE SON CODE
 findCommuneByCode <- function(code){
   db <- getSingleConnexion()
   query <- sprintf("SELECT * FROM commune where code_commune = '%s'", paste(code, collapse = ", "))
@@ -416,7 +424,7 @@ savePost<- function(df){
 }
 #_______________________________________________________________________________
 
-# Verifier si l'entreprise n'existe pas dans la base____________________________
+# CHERCHER UN OBJET ENTREPRISE DANS LA BD À PARTIR DE SON NOM
 findEntrepriseByName<- function(nom){
   db <- getSingleConnexion()
   query <- sprintf("SELECT * FROM entreprise where nom = '%s'", paste(nom, collapse = ", "))
@@ -427,6 +435,7 @@ findEntrepriseByName<- function(nom){
   return(res)
 }
 
+# FONCTION POUR LE CHARGEMENT DES ENTREPRISE DANS LA BASE DE DONNEES
 loadCompany <- function(df){
   apply(df, 1, function(row){
     # verifions si l'entreprise existe deja dans la base
@@ -456,30 +465,7 @@ loadCompany <- function(df){
 }
 #_______________________________________________________________________________
 
-#_______________________________________________________________________________
-#r = generateToken(urlPost) # Generate token
-#dfList = loadJobFromApi(r) # Get data from API and insert in BD
-#entrepriseDf = dfList$en # Liste des entreprise
-#dfPost = dfList$dfPost # Liste des posts recuperer
-#_______________________________________________________________________________
-
-# Recuperer le nombre de ligne chargée
-getNumberOfRows<- function(table, domaine="Tous les domaines", colonne_name=NA, annee){
-  if(domaine=='Tous les domaines'){
-    query <- sprintf("SELECT COUNT(*) FROM %s", paste(table, collapse = ", "))
-  }else{
-    query <- sprintf("SELECT count(distinct %s) FROM POST p
-                   INNER JOIN secteursActivites s ON p.code_secteur = s.code_secteur
-                   WHERE s.libelle = '%s' ",colonne_name,domaine)
-  }
-  db <- getSingleConnexion()
-  dbSendQuery(db, "SET NAMES utf8mb4;")
-  dbSendQuery(db, "SET CHARACTER SET utf8mb4;")
-  res = dbGetQuery(db, query)
-  dbDisconnect(db)
-  return(res)
-}
-getNumberOfRows2 <- function(domaine="Tous les domaines", colonne_name=NA, annee='All'){
+getNumberOfRows <- function(domaine="Tous les domaines", colonne_name=NA, annee='All'){
   df = getPost(domaine)
   df = decompose_date(df)
 
@@ -500,8 +486,7 @@ getDistinctSecteur<- function(table, colonne){
   return(res)
 }
 
-
-
+# FONCTION POUR CHARGER LES DONNEES D'UNE TABLE SOUS FORME DATAFRAME
 getDataFromTable<- function(table){
   db <- getSingleConnexion()
   query <- sprintf("SELECT * FROM %s",table)
@@ -512,7 +497,7 @@ getDataFromTable<- function(table){
   return(res)
 }
 
-# repartition des jobs selon les secteurs
+# CHARGEMENT DES OFFRES EN FONCTIONS D'UN SECTEUR/TOUS LES SECTEURS
 getPost<- function(domaine = "Tous les domaines"){
   if(domaine == 'Tous les domaines'){
     query <- sprintf("SELECT p.ID, p.ref_entreprise, p.intitule, p.description, p.competences, p.libelle_qualification, p.code_secteur, p.dureeTravailLibelle, p.dateCreation,p.experienceExige, s.libelle as libelle_secteur,
@@ -548,19 +533,13 @@ getPost<- function(domaine = "Tous les domaines"){
   return(res)
 }
 
-#df = getPost()
-#colnames(df)
 
+# CREATION DU CORPUS À PARTIR DES CHAMPS DESCRIPTION ET COMPETENCES
 processingCorpus <- function(df, secteur_activite=NA){
   # stopword
   stopwordd = as.data.frame(jsonlite::fromJSON("stop_words_french.json"))
   colnames(stopwordd) = c("stwd")
 
-  #if(!is.na(secteur_activite)){
-    # data of secteur activite
-    #df = df[df$libelle_secteur==secteur_activite,]
-  #}
-  # Joindre la colonne description intitule et competences postes
   #df = unite(df, text, description, competences, sep = " ")
   df$text = paste(df$description, df$competences, sep=" ")
 
@@ -575,24 +554,21 @@ processingCorpus <- function(df, secteur_activite=NA){
     unnest_tokens(output=word,input=text) %>%
     filter(!word %in% stopwordd$stwd) %>%
     select(line,word)
+
   # dictionnaire terme
   dico_terme <- clean_df %>%
     count(word,sort=TRUE)
-
-  #wordcloud
-  # wordcld = wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=10, max.word=50,colors = brewer.pal(8,'Dark2'), random.order = FALSE, scale = c(3,.5))
 
   #comptage des termes par document
   matrice_dtm <- clean_df %>%
     group_by(line,word) %>%
     summarize(freq=n()) %>%
-    cast_dtm(document = line, term = word, value = freq) ##"cast" en MDT (pondération = fréquence) #autre pondération possible, ex. TF-IDF
+    cast_dtm(document = line, term = word, value = freq)
 
   return(list(df=df, dict_terme = dico_terme, matrice_dt = matrice_dtm))
 }
 
-
-
+#  FONCTION UTILITAIRE POUR L'ANALYSE DES CORREPONDANCE (DOMMAINE D'ACTIVITES DES OFFRES)
 getDataforAC <- function(data){
   res = processingCorpus(data)
   mdt_matrix = as.matrix(res$matrice_dt)
@@ -625,24 +601,26 @@ geocodeGratuit <- function(adresses){
   return(tableau)
 }
 
+# RECUPERER LES COORDONNES DES DEPARTEMENTS
 getCoordonneesDept<- function(df){
   dept = unique(df$nom_dept)
   coor_dept= geocodeGratuit(dept)
   return(as.data.frame(coor_dept))
 }
-
+# RECUPERER LES COORDONNES DES REGIONS
 getCoordonneesRegion<- function(df){
   region = unique(df$nom_region)
   coor_reg= geocodeGratuit(region)
   return(as.data.frame(coor_reg))
 }
-
+# RECUPERER LES COORDONNES DES COMMUNES
 getCoordonneesCommune<- function(df){
   communes = unique(df$nom_commune)
   coor_commune = geocodeGratuit(communes)
   return(as.data.frame(coor_commune))
 }
 
+# MAP
 df_leaflet<- function(df){
   df = subset(df, select=c(nom_region))
   df = as.data.frame(df %>% group_by(nom_region) %>% summarise(count = n()))
@@ -652,6 +630,7 @@ df_leaflet<- function(df){
   return(df)
 }
 
+# CREER UN CORPUS À PARTIR DE DESCRIPTION OU COMPETENCES POUR LES ASSOCIATIONS DE MOTS
 dfToCorpusField <- function(df, field="description", plage=100){
   df = head(n=plage, df)
   if(field =="description"){
@@ -670,6 +649,7 @@ dfToCorpusField <- function(df, field="description", plage=100){
   return(list(dtm=DocumentTermMatrix(all_clean), tdm=TermDocumentMatrix(all_clean)))
 }
 
+# NETOYYER LE CORPUS
 clean_corpus <- function(corpus, field = "description"){
   stopwordd = as.data.frame(jsonlite::fromJSON("stop_words_french.json"))
   colnames(stopwordd) = c("stwd")
@@ -683,6 +663,7 @@ clean_corpus <- function(corpus, field = "description"){
   return(corpus)
 }
 
+# MATRICE TERME DOCUMENT ET MATRICE DOCUMENT TERME
 tdm_dtm<- function(clean_corp){
   # generate TDM (terme en ligne et document en clonne)
   tdm <- TermDocumentMatrix(clean_corp)
@@ -691,6 +672,7 @@ tdm_dtm<- function(clean_corp){
   return(list(tdm =tdm, dtm=dtm) )
 }
 
+# TERME FREQUENCY WORD WITH TDM
 term_frequency_with_tdm <- function(tdm,top){
   tdm_to_matrix <- as.matrix(tdm)
   # Sum rows and sort by frequency
@@ -700,6 +682,7 @@ term_frequency_with_tdm <- function(tdm,top){
   return(barplot(term_frequency[1:top], col = "tan",las = 2))
 }
 
+# TERME FREQUENCY WORD WITH TDM
 term_frequency_with_qdap<- function(vecteur_text,top){
   frequency <- freq_terms(
     vecteur_text,
@@ -720,6 +703,7 @@ getHoursByContrat = function(posts){
   return(nbHeuresTravail)
 }
 
+# NORMALISATION DE LA COLONNE HEURE DE TRAVAIL RECUPERER DEPUIS L'API
 normalize_heurestravail = function(posts){
   posts$dureeTravailLibelle = gsub("[[[:alpha:]]","",df$dureeTravailLibelle)
   posts$dureeTravailLibelle = str_sub(posts$dureeTravailLibelle,start = 1, end = 2)
@@ -730,6 +714,7 @@ normalize_heurestravail = function(posts){
   return(posts)
 }
 
+# DECOMPOSITION DE LA DATE
 decompose_date = function(posts) {
   posts$dateCreation = strptime(posts$dateCreation, format = "%Y-%m-%d %H:%M:%S")
   # Séparation en année, mois, jour
@@ -741,6 +726,7 @@ decompose_date = function(posts) {
   return(posts)
 }
 
+# FILTRER ANNEE
 filterNbEntityByYear <- function(posts, year='all'){
   if(year !='all'){
     p <- posts %>%
@@ -777,6 +763,7 @@ Graph_Experience_Qualification = function(posts, secteur='Tous les dommaines'){
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
+# LDA AVEC K FIXÉ
 lda_fixed_k <- function(df, k=2, iter=100){
   res = processingCorpus(head(n=100,df))
   dtm = as.matrix(res$matrice_dt)
@@ -800,6 +787,7 @@ lda_fixed_k <- function(df, k=2, iter=100){
     coord_flip()
 }
 
+# LDA FIND THE BEST K
 lda_best_k <- function(df,iter=100){
   res = processingCorpus(head(n=100,df))
   dtm = as.matrix(res$matrice_dt)
@@ -818,12 +806,43 @@ lda_best_k <- function(df,iter=100){
     geom_line()
 }
 
+# APPRENTISSAGE SUPPERVISE
+supervised_learning <- function(df, positive_mod='Assurance',algo, taille){
+  df = head(n=taille, subset(df, select=c(description, competences,libelle_secteur)))
+  df$cible = ifelse(df$libelle_secteur==positive_mod,'pos','neg')
+  res = processingCorpus(df)
+  mdt_matrix = as.matrix(res$matrice_dt)
+  mat_pond <- ifelse(mdt_matrix>0,1,0)
+  df_pond <- as.data.frame(mat_pond)
+  sum_per_secteur_act <- aggregate(x=df_pond,by=list(df$cible),sum)
+  tmp <- as.matrix(sum_per_secteur_act[,2:ncol(sum_per_secteur_act)])
+  row.names(tmp) <- sum_per_secteur_act$Group.1
+  df_pond$cible = df$cible
+  ctrl <- trainControl(method="cv",number=3)
+  #construire un arbre de décision
+  if(algo == 'Arbre de décision'){
+    arbre <- rpart(cible ~ ., data = df_pond)
+    return(arbre)
+  }else if(algo == 'Foret aleatoire'){
+    # Le taux d'erreur et la matrice de confusion estimer par validation croisée
+    # La validation croisée prend beaucoup de temps prends beaucoup
+    cl <- makePSOCKcluster(3)
+    registerDoParallel(cl)
+    set.seed(12345)
+    sel.mtry <- train(cible~.,data=df_pond,method="rf",trControl=ctrl,tuneGrid = data.frame(mtry = seq(1,41, by=10)))
+    return(sel.mtry)
 
-
-
-
-
-
+  }else{
+    # parametres trouvés par le turning C=100, sigma = 1e-04
+    # Pour une execution rapide nous le fixons
+    C <- c(1,10,100)
+    sigma <- c(0.0001,0.001,0.01)
+    gr.radial <- expand.grid(C=C,sigma=sigma)
+    set.seed(345)
+    sel.radial <- train(cible~.,data=df_pond,method="svmRadial",trControl=ctrl,tuneGrid=gr.radial)
+    return(sel.radial)
+  }
+}
 
 
 

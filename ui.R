@@ -51,7 +51,7 @@ sidebar <- dashboardSidebar(
 )
 
 body <- dashboardBody(
-    bsModal(id = "corpusData", title = "Corpus Data",
+    bsModal(id = "corpusData", title = "Interface de chargement des données",
             trigger = "showData",
             fluidRow(
                 column(6,numericInput(inputId = "Debut", label = "Debut Plage", value = 0, min = 0, max = 1000, step=1)),
@@ -59,8 +59,13 @@ body <- dashboardBody(
             ),
             fluidRow(
                 column(12,selectInput("domaine","Domaine d'activité",choices = unique(getDataFromTable('secteursActivites')$libelle),selected = 'Assurance'))
-            )
-            #verbatimTextOutput("corpusdataText")
+            ),
+            fluidRow(
+                column(12,
+                       actionButton("action", "Charger données"),
+                       verbatimTextOutput("dataInfo")
+                      )
+                )
     ),
 
     tabItems(
@@ -159,14 +164,15 @@ body <- dashboardBody(
         tabItem(tabName="app",
                 box(width=12,
                     fluidRow(
-                        column(4, selectInput("modalite1","One versus All",choices = unique(c("Choice one versus all",getPost()$libelle_secteur)),selected = 'Choice one versus all')),
-                        column(4,selectInput("algo","Algorithme",choices = unique(c('decision tree', 'svm','Choice algorithm')),selected = 'Choice algorithm')),
-                        column(4, sliderInput(inputId = "iter",label = "Nombre d'iterations", value = 100, min = 100, max = 1000, step=50)),
+                        column(4, selectInput("modalite_pos","One versus All",choices = unique(c("Choisir modalité positive",getPost()$libelle_secteur)),selected = 'Choisir modalité positive')),
+                        column(4,selectInput("algo","Algorithme",choices = unique(c('Arbre de décision', 'SVM','Foret aleatoire','Choisir algorithme')),selected = 'Choisir algorithme')),
+                        column(4, sliderInput(inputId = "taille",label = "Taille apprentissage", value = 250, min = 100, max = 500, step=50)),
                     )
                 ),
                 box(width = 12,
                     fluidRow(
-                        column(12, plotOutput("plot", height=400)),
+                        column(6, dataTableOutput("table_result", height=400)),
+                        column(6, plotOutput("plot_tree", height=400)),
                     )
                 )
         )
@@ -177,4 +183,4 @@ body <- dashboardBody(
 )
 
 dashboardPage(header, sidebar, body, skin = "green")
-############## fin UI##########
+

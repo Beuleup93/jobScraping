@@ -31,6 +31,11 @@ shinyServer(function(input, output, session) {
     return(data)
   })
 
+  supervisedLearningReactive <- reactive({
+    mod = supervised_learning(getReactiveData(),positive_mod = input$modalite_pos, algo=input$algo, taille=input$taille)
+    return(mod)
+  })
+
   getReactiveData2 <- reactive({
     data <- getPost()
     if(input$filtreAnne != 'All'){
@@ -66,30 +71,38 @@ shinyServer(function(input, output, session) {
     )
   })
 
+  error_msg <- reactive({
+    shiny::validate(
+      need(input$modalite_pos != 'Choisir modalité positive' & input$algo != 'Choisir algorithme', "S'il vous plait veuiller correctement parametrer l'algorithme")
+    )
+  })
+
+
+
   getACData <- reactive({
     dataAC = getDataforAC(getReactiveData2())
     return(dataAC)
   })
-
+    # red, yellow, aqua, blue, light-blue, green, navy, teal, olive, lime, orange, fuchsia, purple, maroon, black.
     # icons
     output$entreprises <- renderInfoBox({
-        infoBox("entreprises", getNumberOfRows2(domaine=input$secteur,colonne_name = 'ref_entreprise',annee=input$filtreAnne),
+        infoBox("entreprises", getNumberOfRows(domaine=input$secteur,colonne_name = 'ref_entreprise',annee=input$filtreAnne),
                 icon = icon("calendar", lib = "font-awesome"),
-                color = "blue",
+                color = "teal",
                 fill = TRUE)
     })
 
     output$emplois <- renderInfoBox({
-        infoBox("emplois", getNumberOfRows2(domaine=input$secteur,colonne_name ='ID',annee=input$filtreAnne),
+        infoBox("emplois", getNumberOfRows(domaine=input$secteur,colonne_name ='ID',annee=input$filtreAnne),
                 icon = icon("user"),
-                color = "purple",
+                color = "olive",
                 fill = TRUE)
     })
 
     output$percentNew <- renderInfoBox({
-        infoBox("Domaines",getNumberOfRows2(domaine=input$secteur,colonne_name = 'code_secteur',annee=input$filtreAnne),
+        infoBox("Domaines",getNumberOfRows(domaine=input$secteur,colonne_name = 'code_secteur',annee=input$filtreAnne),
             icon = icon("pie-chart"),
-            color = "yellow",
+            color = "navy",
             fill = TRUE)
     })
 
@@ -108,19 +121,19 @@ shinyServer(function(input, output, session) {
           getReactiveData2() %>% group_by(code_secteur)%>%
             summarise(count = n()) %>%
             ggplot() +
-            geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#226D68", width=.6) +
+            geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#03224C", width=.6) +
             ggtitle("Repartition des emplois selon le secteur d'activité")
 
         }else if(input$filtreID=="code_nature_contrat"){
           getReactiveData2() %>% group_by(libelle_nature)%>%
             summarise(count = n()) %>%
             ggplot() +
-            geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#226D68", width=.6) +
+            geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#117A65", width=.6) +
             ggtitle("Repartition des emplois selon la nature des contrat")
 
         }else{
           getReactiveData2() %>% ggplot(aes(x = code_type_contrat)) +
-                geom_bar(fill="#26474E") +
+                geom_bar(fill="#117A65") +
                 ggtitle("Repartition des emplois selon le type de contrat")
         }
 
@@ -130,7 +143,7 @@ shinyServer(function(input, output, session) {
         getReactiveData() %>% group_by(nom_region) %>%
           summarise(count = n()) %>%
           ggplot() +
-          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#23798E", width=.6) +
+          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#117A65", width=.6) +
           ggtitle("Repartition des emplois selon les régions")
     })
 
@@ -140,7 +153,7 @@ shinyServer(function(input, output, session) {
           summarise(count = n()) %>%
           filter(libelle_qualification != 'NULL') %>%
           ggplot() +
-          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#375D81", width=.6) +
+          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#117A65", width=.6) +
           ggtitle("Repartition des emplois selon la qualification")
     })
 
@@ -169,7 +182,7 @@ shinyServer(function(input, output, session) {
         theme_minimal() +
         ggtitle(paste("Top mots", input$secteur)) +
         geom_blank()+
-        scale_fill_manual(values=c("#23798E"))
+        scale_fill_manual(values=c("#117A65"))
       ggplotly(p)
     })
 
@@ -278,6 +291,64 @@ shinyServer(function(input, output, session) {
       lda_fixed_k(getReactiveData(),k=input$kfixed, iter=input$iter)
     }else{
       lda_best_k(getReactiveData(), iter=input$iter)
+    }
+  })
+  output$plot_tree <- renderPlot({
+    if(input$modalite_pos != 'Choisir modalité positive' & input$algo != 'Choisir algorithme'){
+      if(input$algo== 'Arbre de décision'){
+        tree = supervisedLearningReactive()
+        rpart.plot(tree)
+      }else if(input$algo== 'SVM'){
+        svm = supervisedLearningReactive()
+        plot(svm)
+
+      }else{
+        rn = supervisedLearningReactive()
+        plot(rn)
+      }
+    }else{
+      error_msg()
+    }
+  })
+
+  output$table_result = renderDataTable({
+    if(input$modalite_pos != 'Choisir modalité positive' & input$algo != 'Choisir algorithme'){
+      if(input$algo == 'Arbre de décision'){
+        tree = supervisedLearningReactive()
+        dd = as.data.frame(tree$variable.importance)
+        dd
+      }else if(input$algo == 'SVM'){
+        svm = supervisedLearningReactive()
+        subset(as.data.frame(svm$results), select=c(C,sigma,Accuracy))
+      }else{
+        rn = supervisedLearningReactive()
+        as.data.frame(rn$results)
+      }
+    }else{
+      error_msg()
+    }
+  })
+
+  observeEvent(input$action, {
+    # Check that data object exists and is data frame.
+    # L'ecart ne doit pas depasser 150
+    if ((input$Debut >= 0 && input$Debut<850) && (input$Debut < input$Fin) && (input$Fin - input$Debut < 150)) {
+      # Appel methode  API et chargement dans la BD
+      output$info <- renderPrint({
+        'Chargement des données en cours'
+      })
+      # FONCTION DIFICILE À AUTOMATISER DU AU FAIT QUE L'API CHANGE SOUVENT DE CONFIGURATION
+      # ÇA MARCHER JUSQU'ICI, MAIS JE LE COMMENTE AU CAS OU, AVANT QUE ÇA BUG.
+
+      #loadJobApiInDB(input$Debut,input$Fin,input$secteur)
+      output$info <- renderPrint({
+        'Données chargées avec succes dans la BD'
+      })
+
+    } else {
+      output$info <- renderPrint({
+        'Erreur de chargement, veuillez verifier les logs!!'
+      })
     }
   })
 
