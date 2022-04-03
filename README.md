@@ -40,5 +40,5 @@ This dataframe will then be processed to be integrated into the database to whic
 
 ### Constitution of the database
 
-We have retrieved the data of job offers and French geographical locations using APIs and we need to store them in a database. To do this, we first created the data model by analyzing the data returned by the APIs. Then we automated the process of retrieving the data from the API and loading it into the database (MYSQL).
+We have retrieved the data of job offers and geographic breakdowns using APIs and we need to store them in a database. To do this, we first created the data model by analyzing the data returned by the APIs. Then we automated the process of retrieving the data from the APIs and loading it into the database (MYSQL).
 
