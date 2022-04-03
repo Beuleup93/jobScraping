@@ -59,3 +59,8 @@ We have retrieved the data of job offers and geographic breakdowns using APIs an
 </div>
 <br/> 
 
+### Presentation of the RShiny application
+
+#### Architecture of the application
+
+
