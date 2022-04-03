@@ -109,7 +109,7 @@ shinyServer(function(input, output, session) {
     output$mymap <- renderLeaflet({
 
       getDataLeaflet() %>% leaflet() %>%
-        setView(lng = 1.888334, lat = 46.60335, zoom = 5)  %>% #setting the view over ~ center of North America
+        setView(lng = 1.888334, lat = 46.60335, zoom = 5)  %>% #setting the view over ~ France
         addTiles() %>%
         addMarkers(lng = ~lon,
                    lat = ~lat,
@@ -121,58 +121,36 @@ shinyServer(function(input, output, session) {
           getReactiveData2() %>% group_by(code_secteur)%>%
             summarise(count = n()) %>%
             ggplot() +
-<<<<<<< HEAD
-            geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#03224C", width=.6) +
-            ggtitle("Repartition des emplois selon le secteur d'activité")
-=======
-            geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#226D68", width=.6) +
+            geom_col(aes(x = reorder(code_secteur,-count) , y= count), fill = "#03224C", width=.6) + #226D68
             xlab("Code du secteur") +
             ylab("Nombre d'offres") +
             ggtitle("Répartition des emplois selon le secteur d'activité")
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
 
         }else if(input$filtreID=="code_nature_contrat"){
           getReactiveData2() %>% group_by(libelle_nature)%>%
             summarise(count = n()) %>%
             ggplot() +
-<<<<<<< HEAD
-            geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#117A65", width=.6) +
-            ggtitle("Repartition des emplois selon la nature des contrat")
-
-        }else{
-          getReactiveData2() %>% ggplot(aes(x = code_type_contrat)) +
-                geom_bar(fill="#117A65") +
-                ggtitle("Repartition des emplois selon le type de contrat")
-=======
-            geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#226D68", width=.6) +
+            geom_col(aes(y = reorder(libelle_nature,-count), x= count), fill = "#226D68", width=.6) + #117A65
             xlab("Nombre d'offres") +
             ylab("Nature du contrat") +
             ggtitle("Répartition des emplois selon la nature des contrats")
-
         }else{
-          getReactiveData2() %>% ggplot(aes(x = code_type_contrat)) +
+          getReactiveData2() %>% ggplot(aes(x = code_type_contrat)) +  #117A65
                 geom_bar(fill="#226D68") +
                 xlab("Type de contrat") +
                 ylab("Nombre d'offres") +
                 ggtitle("Répartition des emplois selon le type de contrat")
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
         }
-
     })
 
     output$plot2 <- renderPlot({
         getReactiveData() %>% group_by(nom_region) %>%
           summarise(count = n()) %>%
           ggplot() +
-<<<<<<< HEAD
-          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#117A65", width=.6) +
-          ggtitle("Repartition des emplois selon les régions")
-=======
-          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#226D68", width=.6) +
+          geom_col(aes(x = count, y= reorder(nom_region,-count)), fill = "#226D68", width=.6) + #117A65
           xlab("Nombre d'offres") +
           ylab("Régions") +
           ggtitle("Répartition des emplois selon les régions")
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
     })
 
     output$plot3 <- renderPlot({
@@ -181,15 +159,11 @@ shinyServer(function(input, output, session) {
           summarise(count = n()) %>%
           filter(libelle_qualification != 'NULL') %>%
           ggplot() +
-<<<<<<< HEAD
-          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#117A65", width=.6) +
-          ggtitle("Repartition des emplois selon la qualification")
-=======
-          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#226D68", width=.6) +
+
+          geom_col(aes(x = count, y= reorder(libelle_qualification,-count)), fill = "#226D68", width=.6) + ##117A65
           xlab("Nombre d'offres") +
           ylab("Qualification") +
           ggtitle("Répartition des emplois selon la qualification")
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
     })
 
 
@@ -219,11 +193,7 @@ shinyServer(function(input, output, session) {
         ylab("Nombre d'occurences") +
         xlab("Mots") +
         geom_blank()+
-<<<<<<< HEAD
-        scale_fill_manual(values=c("#117A65"))
-=======
-        scale_fill_manual(values=c("#226D68"))
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
+        scale_fill_manual(values=c("#117A65")) ##226D68
       ggplotly(p)
     })
 
@@ -243,21 +213,21 @@ shinyServer(function(input, output, session) {
     output$plot_s2 <- renderPlot({
       tmp = getCorpusData()
       dico_terme = tmp$dict_terme
-      wordcloud(words=dico_terme$word,freq=dico_terme$n, min.freq=5,max.word=input$max,colors = brewer.pal(8,'Dark2'))
+      wordcloud(words = dico_terme$word,freq=dico_terme$n, min.freq=5, max.word=input$max,colors = brewer.pal(8,'Dark2'))
     })
 
     # DataTable
   output$emploiTable = renderDataTable({
       datatable(
         getReactiveData() %>%
-          select(c(nom, intitule,libelle_secteur, libelle_type,libelle_qualification,nom_commune,nom_dept)),
+          select(c(nom, intitule,libelle_secteur, libelle_type,libelle_qualification,nom_commune)),
         options =list(pagingType = "simple",pageLength = 5))
     })
 
   output$entrepriseTable = renderDataTable({
     datatable(
       getReactiveData() %>%
-        select(c(intitule,nom, url,logo)),
+        select(c(intitule,nom, url)),
       options =list(pagingType = "simple",pageLength = 8))
   })
 

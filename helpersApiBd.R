@@ -43,8 +43,9 @@ options(api = list(
 # PARAMETRE DE CONNEXION BASE DE DONNEE MYSQL, A ADAPTER SELON LES INFORMATIONS DE CONNEXIONS
 options(mysql = list(
   "host" = "127.0.0.1",
-  "port" = 3306,
+  "port" = 8889,
   "user" = "root",
+  "password" = "root",
   "databaseName" = "bd_emploi"
 ))
 
@@ -54,7 +55,8 @@ getSingleConnexion <- function(){
                   dbname = options()$mysql$databaseName,
                   host = options()$mysql$host,
                   port = options()$mysql$port,
-                  user = options()$mysql$user)
+                  user = options()$mysql$user,
+                  password = options()$mysql$password)
   return(db)
 }
 
@@ -758,7 +760,7 @@ Graph_Experience_Qualification = function(posts, secteur='Tous les dommaines'){
     # Affichage des valeurs sur les barres
     scale_y_continuous(labels = percent) +
     #Couleur
-    scale_fill_manual(values = c("#226D68", "#807DBA")) +
+    scale_fill_manual(values = c("#39CCCC", "#306F5B")) +
     # Affichage incliné des noms des qualifications
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }

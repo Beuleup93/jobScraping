@@ -51,18 +51,13 @@ sidebar <- dashboardSidebar(
 )
 
 body <- dashboardBody(
-<<<<<<< HEAD
     bsModal(id = "corpusData", title = "Interface de chargement des données",
-=======
-    bsModal(id = "corpusData", title = "Corpus de données",
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
             trigger = "showData",
             fluidRow(
                 column(6,numericInput(inputId = "Debut", label = "Début de la plage", value = 0, min = 0, max = 1000, step=1)),
                 column(6,numericInput(inputId = "Fin", label = "Fin de la plage", value = 149, min = 50, max = 1000, step=1))
             ),
             fluidRow(
-<<<<<<< HEAD
                 column(12,selectInput("domaine","Domaine d'activité",choices = unique(getDataFromTable('secteursActivites')$libelle),selected = 'Assurance'))
             ),
             fluidRow(
@@ -71,11 +66,6 @@ body <- dashboardBody(
                        verbatimTextOutput("dataInfo")
                       )
                 )
-=======
-                column(12,selectInput("domaine","Domaine d'activités",choices = unique(getDataFromTable('secteursActivites')$libelle),selected = 'Assurance'))
-            )
-            #verbatimTextOutput("corpusdataText")
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
     ),
 
     tabItems(
@@ -96,7 +86,7 @@ body <- dashboardBody(
         ),
 
         tabItem(tabName = "map",
-                box(width = 12, leafletOutput("mymap", height = 650))
+                box(width = 12, leafletOutput("mymap", height = 600))
         ),
 
         tabItem(tabName = "dimension",
@@ -120,8 +110,6 @@ body <- dashboardBody(
                 ),
         ),
         tabItem(tabName="AC",
-                box(width=8, plotOutput("plot_s2", height = 250)),
-                box(width=4, sliderInput("max","Nombre maximal de mots:", min = 1,  max = 300,  value = 100)),
                 box(width=8, plotly::plotlyOutput("plot_ac", height = 330)),
                 box(width=4,
                     selectInput(
@@ -132,6 +120,8 @@ body <- dashboardBody(
                         size = 13,
                         selectize = FALSE)
                 ),
+                box(width=8, plotOutput("plot_s2", height = 250)),
+                box(width=4, sliderInput("max","Nombre maximal de mots:", min = 1,  max = 300, step=1, value = 100)),
         ),
 
         tabItem(tabName = "statistique",
@@ -174,21 +164,16 @@ body <- dashboardBody(
         tabItem(tabName="app",
                 box(width=12,
                     fluidRow(
-<<<<<<< HEAD
                         column(4, selectInput("modalite_pos","One versus All",choices = unique(c("Choisir modalité positive",getPost()$libelle_secteur)),selected = 'Choisir modalité positive')),
                         column(4,selectInput("algo","Algorithme",choices = unique(c('Arbre de décision', 'SVM','Foret aleatoire','Choisir algorithme')),selected = 'Choisir algorithme')),
                         column(4, sliderInput(inputId = "taille",label = "Taille apprentissage", value = 250, min = 100, max = 500, step=50)),
-=======
-                        column(4, selectInput("modalite1","Une versus les autres",choices = unique(c("Une versus les autres",getPost()$libelle_secteur)),selected = 'Une versus les autres')),
-                        column(4,selectInput("algo","Algorithmes",choices = unique(c('decision tree', 'svm','Choix d\'algorithme')),selected = 'Choix d\'algorithme')),
-                        column(4, sliderInput(inputId = "iter",label = "Nombre d'iterations", value = 100, min = 100, max = 1000, step=50)),
->>>>>>> ea5ce86d7c70fa92106c62cd156854b580aef76b
+
                     )
                 ),
                 box(width = 12,
                     fluidRow(
                         column(6, dataTableOutput("table_result", height=400)),
-                        column(6, plotOutput("plot_tree", height=400)),
+                        column(6, plotOutput("plot_tree", height=400))
                     )
                 )
         )
