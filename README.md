@@ -43,7 +43,7 @@ This dataframe will then be processed to be integrated into the database to whic
 We have retrieved the data of job offers and geographic breakdowns using APIs and we need to store them in a database. To do this, we first created the data model by analyzing the data returned by the APIs. Then we automated the process of retrieving the data from the APIs and loading it into the database (MYSQL).
 **Data Model**
 <div align="center">
-<img width="504" alt="Capture d’écran 2022-04-03 à 13 00 25" src="https://user-images.githubusercontent.com/31353252/161429334-ad3f1186-27aa-40aa-becd-be56e52793da.png">
+<img width="300" alt="Capture d’écran 2022-04-03 à 13 00 25" src="https://user-images.githubusercontent.com/31353252/161429334-ad3f1186-27aa-40aa-becd-be56e52793da.png">
 </div>
 <br/> 
 
