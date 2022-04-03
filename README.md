@@ -69,3 +69,16 @@ We have retrieved the data of job offers and geographic breakdowns using APIs an
 <br/> 
 
 #### RShiny application
+
+<div align="center">
+<img width="750" alt="Capture d’écran 2022-04-03 à 17 48 17" src="https://user-images.githubusercontent.com/31353252/161441328-bb693d52-0da1-4357-8143-3c384e4e1135.png">
+
+<img width="750" alt="Capture d’écran 2022-04-03 à 17 51 24" src="https://user-images.githubusercontent.com/31353252/161441335-3e27d225-abcf-4293-a4d6-2774ff093316.png">
+
+<img width="750" alt="Capture d’écran 2022-04-03 à 17 51 50" src="https://user-images.githubusercontent.com/31353252/161441341-df661ced-02e7-4fb5-b5e9-5a0b83c500cf.png">
+
+<img width="750" alt="Capture d’écran 2022-04-03 à 17 52 07" src="https://user-images.githubusercontent.com/31353252/161441356-fcf7e1b7-c761-4045-b28d-80ae51cfd914.png">
+
+<img width="750" alt="Capture d’écran 2022-04-03 à 17 52 36" src="https://user-images.githubusercontent.com/31353252/161441362-d0e8d863-abbe-473b-83f2-a6aedac73378.png">
+</div>
+<br/>
