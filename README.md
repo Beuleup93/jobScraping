@@ -67,3 +67,5 @@ We have retrieved the data of job offers and geographic breakdowns using APIs an
 <img width="775" alt="Capture d’écran 2022-04-03 à 13 11 21" src="https://user-images.githubusercontent.com/31353252/161429986-414241c4-3766-4584-a75d-3d1e0afbbc42.png">
 </div>
 <br/> 
+
+#### RShiny application
