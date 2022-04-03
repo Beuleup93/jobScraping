@@ -23,11 +23,10 @@ We want to analyze the job offers according to several criteria such as the type
 
 To use an API, you must first have :
 - declared an application,
-- subscribed to an API in order to obtain a client ID and a secret key.
-<br/> 
+- subscribed to an API in order to obtain a client ID and a secret key.<br/> 
 This information must be kept carefully, because it is necessary to request an API. You can find them at any time on the configuration page of your application accessible from the dashboard.
 To be able to use the Pôle Emploi API, we need to generate an access token with the client identifier and the secret key provided beforehand, which expires after 24 minutes. Once we have the access token, we can query the API and retrieve the job offers in JSON format. The figure below illustrates the principle of generating the token:
-
+<br/> 
 <div align="center">
 <img width="604" alt="Capture d’écran 2022-04-03 à 12 33 09" src="https://user-images.githubusercontent.com/31353252/161428443-0c007b3b-81b6-44a5-81b9-d792fe1687cf.png">
 </div>
