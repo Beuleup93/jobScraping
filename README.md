@@ -32,3 +32,8 @@ To be able to use the Pôle Emploi API, we need to generate an access token with
 <img width="604" alt="Capture d’écran 2022-04-03 à 12 33 09" src="https://user-images.githubusercontent.com/31353252/161428443-0c007b3b-81b6-44a5-81b9-d792fe1687cf.png">
 </div>
 <br/> 
+
+### API consumption with Rstudio
+
+We have created a code that allows to connect to the API from R. We have encapsulated in a function the connection links and all the parameters to query the API, generate an access token and through it, we retrieve the Json object that we then transform into dataframe.
+This dataframe will then be processed to be integrated into the database to which the Shiny application will connect. From there, the data are stored in the database, all the links between API, database and R script are realized.
