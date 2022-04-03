@@ -49,7 +49,12 @@ We have retrieved the data of job offers and geographic breakdowns using APIs an
 
 **Loaded Data in MySQL Database**
 <div align="center">
-<img width="504" alt="Capture d’écran 2022-04-03 à 13 00 25" src="https://user-images.githubusercontent.com/31353252/161429334-ad3f1186-27aa-40aa-becd-be56e52793da.png">
+<img width="1032" alt="Capture d’écran 2022-04-03 à 13 05 51" src="https://user-images.githubusercontent.com/31353252/161429610-47c35bfe-93cc-46dd-939d-cc987271dc61.png">
+</div>
+<br/> 
+
+<div align="center">
+<img width="1109" alt="Capture d’écran 2022-04-03 à 13 06 29" src="https://user-images.githubusercontent.com/31353252/161429616-9c475b55-14ca-45b0-a48b-ee0a2f54a57b.png">
 </div>
 <br/> 
 
