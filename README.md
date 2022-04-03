@@ -1,4 +1,4 @@
-### JobScraping: Development of an interactive R-Shiny application for the analysis of job offers using Text Mining techniques
+### Development of an interactive R-Shiny application for the analysis of job offers using Text Mining techniques
 
 #### DESCRIPTION
 
