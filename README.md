@@ -13,3 +13,8 @@ We want to analyze the job offers according to several criteria such as the type
 * The analysis must integrate a regional/territorial dimension, we expect to see interactive cartographic representations in the application.
 * The application should be as dynamic as possible, interactive graphics (e.g. plotly, etc.) will be appreciated.
 * Deliverable: pdf report written in LaTeX, the corpus (the base), the R source code of the Shiny application, the installation files.
+
+### Data retrieval and use via API
+
+* To retrieve the job offers, we used the API of pole emploi https://pole-emploi.io/data/api/offres-emploi?tabgroup-api=documentation&doc-section=api-doc-section-rechercher-par-critères.
+* For the geographic breakdown, the API of data.gouv https://www.data.gouv.fr/fr/
