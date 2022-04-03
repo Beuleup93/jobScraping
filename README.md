@@ -37,3 +37,8 @@ To be able to use the Pôle Emploi API, we need to generate an access token with
 
 We have created a code that allows to connect to the API from R. We have encapsulated in a function the connection links and all the parameters to query the API, generate an access token and through it, we retrieve the Json object that we then transform into dataframe.
 This dataframe will then be processed to be integrated into the database to which the Shiny application will connect. From there, the data are stored in the database, all the links between API, database and R script are realized.
+
+### Constitution of the database
+
+We have retrieved the data of job offers and French geographical locations using APIs and we need to store them in a database. To do this, we first created the data model by analyzing the data returned by the APIs. Then we automated the process of retrieving the data from the API and loading it into the database (MYSQL).
+
